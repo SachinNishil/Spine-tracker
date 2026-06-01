@@ -126,14 +126,15 @@
   .syncbar.s-error{color:#b6493a} .syncbar.s-error .syncdot{background:#b6493a}
   footer{text-align:center;font-size:12px;color:var(--muted);margin-top:24px;line-height:1.6}
 
-  .week-strip{display:flex;justify-content:space-between;gap:6px;margin-bottom:16px}
-  .bub-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;cursor:pointer}
-  .bub{width:100%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;transition:transform .1s;border:1px solid var(--line)}
-  .bub:active{transform:scale(.93)}
-  .bub.filled{background:var(--accent);border-color:var(--accent);color:#fff}
-  .bub.empty{background:#fff;color:var(--muted)}
-  .bub.active-day{outline:2px solid var(--accent);outline-offset:2px}
-  .bub.active-day.empty{outline-color:var(--muted)}
+  .week-strip{display:flex;justify-content:flex-start;align-items:flex-start;gap:8px;margin-bottom:16px}
+  .bub-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;width:44px;flex-shrink:0}
+  .bub-outer{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex-shrink:0}
+  .bub-outer.filled{background:var(--accent);border-color:var(--accent)}
+  .bub-outer.active-day{outline:2px solid var(--accent);outline-offset:2px}
+  .bub-outer.active-day.empty{outline-color:var(--muted)}
+  .bub-outer:active{transform:scale(.93)}
+  .bub{font-size:13px;font-weight:600;color:var(--muted);line-height:1;pointer-events:none}
+  .bub-outer.filled .bub{color:#fff}
   .bub-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.03em}
 </style>
 </head>
@@ -541,14 +542,20 @@ function buildWeekStrip(){
     const isActive=iso===currentDate;
 
     const wrap=document.createElement("div"); wrap.className="bub-wrap";
-    const bub=document.createElement("div");
-    bub.className="bub"+(filled?" filled":" empty")+(isActive?" active-day":"");
-    bub.textContent=String(d.getDate()).padStart(2,"0");
+
+    const outer=document.createElement("div");
+    outer.className="bub-outer"+(filled?" filled":" empty")+(isActive?" active-day":"");
+    
+
+    const num=document.createElement("span");
+    num.className="bub";
+    num.textContent=String(d.getDate()).padStart(2,"0");
 
     const lbl=document.createElement("div"); lbl.className="bub-label";
     lbl.textContent=i===0?"today":DAY_SHORT[d.getDay()];
 
-    wrap.appendChild(bub); wrap.appendChild(lbl);
+    outer.appendChild(num);
+    wrap.appendChild(outer); wrap.appendChild(lbl);
     wrap.addEventListener("click",()=>{ setDate(iso); window.scrollTo({top:0,behavior:"smooth"}); });
     strip.appendChild(wrap);
   }
