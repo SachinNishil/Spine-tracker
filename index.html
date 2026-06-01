@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#1f6f63">
+<title>Daily Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f3eee4;
+    --card:#fbf8f2;
+    --ink:#20211d;
+    --muted:#736f66;
+    --line:#e3ddd0;
+    --accent:#1f6f63;
+    --accent-soft:#dceae4;
+    --arm:#c4623f;
+    --leg:#c79a3a;
+    --sleep:#1f6f63;
+    --shadow:0 1px 2px rgba(32,33,29,.04), 0 8px 24px rgba(32,33,29,.06);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Hanken Grotesk",system-ui,sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(circle at 1px 1px, rgba(32,33,29,.025) 1px, transparent 0);
+    background-size:22px 22px;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:22px 16px 80px}
+  header.app{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .title{font-family:"Fraunces",serif;font-weight:500;font-size:30px;letter-spacing:-.01em;line-height:1.05;margin:0}
+  .title small{display:block;font-family:"Hanken Grotesk";font-weight:500;font-size:13px;color:var(--muted);letter-spacing:.02em;margin-top:4px}
+  .datebox{display:flex;align-items:center;gap:8px}
+  .datebox label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+  input[type=date]{font-family:inherit;font-size:15px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 11px;box-shadow:var(--shadow)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .card h2{font-family:"Fraunces",serif;font-weight:500;font-size:20px;margin:0 0 2px;letter-spacing:-.01em}
+  .card .sub{font-size:13px;color:var(--muted);margin:0 0 16px}
+  .seclabel{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:18px 0 9px}
+  .seclabel:first-of-type{margin-top:4px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;transition:all .14s ease;user-select:none}
+  .chip:active{transform:scale(.97)}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(31,111,99,.25)}
+
+  .slider-row{margin:14px 0 4px}
+  .slider-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  .slider-head .name{font-size:15px;font-weight:600}
+  .slider-head .ends{font-size:11px;color:var(--muted)}
+  .slider-head .val{font-family:"Fraunces",serif;font-size:20px;font-weight:600;min-width:34px;text-align:right}
+  .val.arm{color:var(--arm)} .val.leg{color:var(--leg)} .val.sleep{color:var(--sleep)}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:99px;background:var(--line);outline:none;margin:2px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid var(--accent);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+  input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid var(--accent);cursor:pointer}
+  input[type=range].arm::-webkit-slider-thumb{border-color:var(--arm)}
+  input[type=range].leg::-webkit-slider-thumb{border-color:var(--leg)}
+  input[type=range].arm::-moz-range-thumb{border-color:var(--arm)}
+  input[type=range].leg::-moz-range-thumb{border-color:var(--leg)}
+
+  .field{margin:14px 0}
+  .field label{display:block;font-size:15px;font-weight:600;margin-bottom:7px}
+  .field .hint{font-weight:400;color:var(--muted);font-size:13px}
+  input[type=number],textarea{font-family:inherit;font-size:15px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:11px;padding:11px 12px;width:100%}
+  textarea{resize:vertical;min-height:62px}
+  input[type=number]{max-width:160px}
+
+  .savebar{display:flex;gap:10px;align-items:center;margin-top:20px;flex-wrap:wrap}
+  .btn{font-family:inherit;font-size:15px;font-weight:600;border-radius:12px;padding:12px 20px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);transition:all .14s}
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(31,111,99,.28)}
+  .btn.ghost{background:transparent}
+  .btn.danger{color:#a8392a;border-color:#e8cfc9}
+  .saved-note{font-size:13px;color:var(--accent);font-weight:600;opacity:0;transition:opacity .3s}
+  .saved-note.show{opacity:1}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:10px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .chart-box{position:relative;height:240px}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:26px 10px}
+
+  .pattern{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .pattern:last-child{border-bottom:none}
+  .pattern .pn{font-weight:600;font-size:14px}
+  .pattern .pv{font-size:13px;color:var(--muted);text-align:right}
+  .pattern .pv b{font-family:"Fraunces",serif;color:var(--ink);font-size:15px}
+  .pdelta{font-weight:700;font-size:12px;padding:2px 8px;border-radius:99px;margin-left:6px;white-space:nowrap}
+  .pdelta.worse{background:#f6e3de;color:#a8392a}
+  .pdelta.better{background:var(--accent-soft);color:var(--accent)}
+  .pdelta.flat{background:#ece8de;color:var(--muted)}
+
+  .entry{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .entry:last-child{border-bottom:none}
+  .entry:active{opacity:.6}
+  .entry .ed{font-weight:600;font-size:14px;min-width:96px}
+  .entry .escores{display:flex;gap:10px;font-size:13px;color:var(--muted);flex-wrap:wrap;flex:1}
+  .pill{display:inline-flex;align-items:center;gap:4px;font-weight:600}
+  .pill i{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .entry .del{color:#b6493a;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;padding:6px}
+
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .toolbar .btn{font-size:13px;padding:9px 14px}
+  .syncbar{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:-4px 0 16px 2px;font-weight:600}
+  .syncdot{width:8px;height:8px;border-radius:50%;background:#9a958a;transition:background .2s}
+  .syncbar.s-synced{color:var(--accent)} .syncbar.s-synced .syncdot{background:var(--accent)}
+  .syncbar.s-syncing .syncdot{background:var(--leg)}
+  .syncbar.s-error{color:#b6493a} .syncbar.s-error .syncdot{background:#b6493a}
+  footer{text-align:center;font-size:12px;color:var(--muted);margin-top:24px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app">
+    <h1 class="title">Daily Tracker<small>Activities &amp; how the body responds</small></h1>
+    <div class="datebox">
+      <label for="date">Date</label>
+      <input type="date" id="date">
+    </div>
+  </header>
+
+  <div class="syncbar s-syncing" id="syncbar"><span class="syncdot"></span><span id="syncmsg">Connecting to Notion…</span></div>
+
+  <!-- LOG -->
+  <section class="card">
+    <h2>Today's log</h2>
+    <p class="sub">Tap what applied, then rate how things felt. Saving again for the same date updates it.</p>
+
+    <div class="seclabel">Movement</div>
+    <div class="chips" data-group="activities" id="chips-move"></div>
+
+    <div class="seclabel">Before bed</div>
+    <div class="chips" data-group="activities" id="chips-bed"></div>
+
+    <div class="seclabel">Other</div>
+    <div class="chips" data-group="activities" id="chips-other"></div>
+
+    <div class="seclabel">How it felt</div>
+
+    <div class="slider-row">
+      <div class="slider-head"><span class="name">Arm numbness / tingling</span><span class="ends">0 none · 10 severe</span><span class="val arm" id="v-arm">0</span></div>
+      <input type="range" class="arm" id="s-arm" min="0" max="10" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-head"><span class="name">Leg symptoms / RLS</span><span class="ends">0 none · 10 severe</span><span class="val leg" id="v-leg">0</span></div>
+      <input type="range" class="leg" id="s-leg" min="0" max="10" value="0">
+    </div>
+    <div class="slider-row">
+      <div class="slider-head"><span class="name">Sleep quality</span><span class="ends">1 poor · 10 great</span><span class="val sleep" id="v-sleep">5</span></div>
+      <input type="range" class="sleep" id="s-sleep" min="1" max="10" value="5">
+    </div>
+
+    <div class="field">
+      <label for="latency">Time to fall asleep <span class="hint">(minutes)</span></label>
+      <input type="number" id="latency" min="0" max="600" placeholder="e.g. 20">
+    </div>
+
+    <div class="field">
+      <label for="notes">Notes <span class="hint">(optional — sleep position, anything unusual)</span></label>
+      <textarea id="notes" placeholder="Slept prone with arms up, socks on…"></textarea>
+    </div>
+
+    <div class="savebar">
+      <button class="btn primary" id="save">Save entry</button>
+      <button class="btn ghost" id="clearform">Reset form</button>
+      <span class="saved-note" id="savednote">Saved ✓</span>
+    </div>
+  </section>
+
+  <!-- TRENDS -->
+  <section class="card">
+    <h2>Trends</h2>
+    <p class="sub">Your symptom scores over time.</p>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--arm)"></i>Arm</span>
+      <span><i class="dot" style="background:var(--leg)"></i>Leg / RLS</span>
+      <span><i class="dot" style="background:var(--sleep)"></i>Sleep quality</span>
+    </div>
+    <div class="chart-box"><canvas id="chart"></canvas></div>
+    <div class="empty" id="chart-empty" style="display:none">Log a few days and your trend lines will appear here.</div>
+  </section>
+
+  <!-- PATTERNS -->
+  <section class="card">
+    <h2>Patterns</h2>
+    <p class="sub">Average symptom score on days you did each thing vs days you didn't. (Needs ~7+ logged days to mean much.)</p>
+    <div id="patterns"></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="card">
+    <h2>History</h2>
+    <p class="sub">Tap an entry to load it back into the form and edit.</p>
+    <div id="history"></div>
+    <div class="toolbar">
+      <button class="btn" id="exp-csv">Export CSV</button>
+      <button class="btn" id="exp-json">Backup (JSON)</button>
+      <button class="btn ghost" id="imp-json">Restore backup</button>
+      <button class="btn danger" id="clearall">Delete all</button>
+      <input type="file" id="importfile" accept=".json" style="display:none">
+    </div>
+  </section>
+
+  <footer>
+    Entries sync to your Notion database. A local copy is also kept on this device, so the app works offline and catches up when it reconnects.<br>
+    Backup (JSON) and Export CSV still work as an extra safety net — and the CSV is handy for your doctor.
+  </footer>
+</div>
+
+<script>
+/* ---------- config: edit this list to add/remove things you track ---------- */
+const ACTIVITIES = [
+  {id:"walk",       label:"Walking",            grp:"move"},
+  {id:"heavywalk",  label:"Heavy walking / standing", grp:"move"},
+  {id:"gym",        label:"Gym",                grp:"move"},
+  {id:"swim",       label:"Swimming",           grp:"move"},
+  {id:"dayex",      label:"Daytime exercise",   grp:"move"},
+  {id:"bedex",      label:"Bedtime stretches",  grp:"bed"},
+  {id:"shower",     label:"Shower before bed",  grp:"bed"},
+  {id:"socks",      label:"Socks to bed",       grp:"bed"},
+  {id:"prone",      label:"Slept prone/freefall", grp:"bed"},
+  {id:"caffeine",   label:"Caffeine",           grp:"other"},
+  {id:"cald3",      label:"Calcium + D3",       grp:"other"},
+  {id:"omega",      label:"Omega-3",            grp:"other"},
+];
+const KEY = "spine_tracker_entries_v1";
+const API_URL = "/api/entries";   // the Vercel serverless function (the "middleman")
+
+const labelOf = id => (ACTIVITIES.find(a=>a.id===id)||{}).label || id;
+const idOf = label => (ACTIVITIES.find(a=>a.label===label)||{}).id || null;
+
+/* ---------- storage: works deployed (localStorage) and in Claude preview ---------- */
+const Store = {
+  async get(k){
+    if (window.storage && window.storage.get){
+      try{ const r = await window.storage.get(k); return r ? r.value : null; }catch{ return null; }
+    }
+    try{ return localStorage.getItem(k); }catch{ return null; }
+  },
+  async set(k,v){
+    if (window.storage && window.storage.set){
+      try{ await window.storage.set(k,v); return; }catch{}
+    }
+    try{ localStorage.setItem(k,v); }catch{}
+  }
+};
+
+let entries = {};   // { "YYYY-MM-DD": {activities:{}, arm, leg, sleep, latency, notes} }
+let chart = null;
+
+const $ = id => document.getElementById(id);
+const todayStr = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local
+
+/* ---------- build the chips ---------- */
+function buildChips(){
+  const map = {move:"chips-move", bed:"chips-bed", other:"chips-other"};
+  ACTIVITIES.forEach(a=>{
+    const el = document.createElement("button");
+    el.className = "chip"; el.textContent = a.label; el.dataset.id = a.id; el.type="button";
+    el.addEventListener("click", ()=> el.classList.toggle("on"));
+    $(map[a.grp]).appendChild(el);
+  });
+}
+
+/* ---------- form <-> data ---------- */
+function readForm(){
+  const acts = {};
+  document.querySelectorAll(".chip").forEach(c=>{ if(c.classList.contains("on")) acts[c.dataset.id]=true; });
+  return {
+    activities: acts,
+    arm: +$("s-arm").value,
+    leg: +$("s-leg").value,
+    sleep: +$("s-sleep").value,
+    latency: $("latency").value === "" ? null : +$("latency").value,
+    notes: $("notes").value.trim()
+  };
+}
+function writeForm(e){
+  document.querySelectorAll(".chip").forEach(c=> c.classList.toggle("on", !!(e && e.activities && e.activities[c.dataset.id])));
+  $("s-arm").value = e ? e.arm : 0;       $("v-arm").textContent = e ? e.arm : 0;
+  $("s-leg").value = e ? e.leg : 0;       $("v-leg").textContent = e ? e.leg : 0;
+  $("s-sleep").value = e ? e.sleep : 5;   $("v-sleep").textContent = e ? e.sleep : 5;
+  $("latency").value = e && e.latency!=null ? e.latency : "";
+  $("notes").value = e ? e.notes : "";
+}
+function loadDate(){
+  writeForm(entries[$("date").value] || null);
+}
+
+/* ---------- save / delete ---------- */
+async function save(){
+  const d = $("date").value; if(!d) return;
+  entries[d] = readForm();
+  await Store.set(KEY, JSON.stringify(entries));   // instant local save
+  render();
+  const n = $("savednote"); n.classList.add("show"); setTimeout(()=>n.classList.remove("show"), 1600);
+  setStatus("syncing","Saving to Notion…");
+  try{ await pushToServer(d, entries[d]); setStatus("synced","Synced with Notion ✓"); }
+  catch{ setStatus("error","Saved on this device — Notion sync failed, will retry next save."); }
+}
+async function delEntry(d){
+  if(!confirm("Delete the entry for "+d+"?")) return;
+  delete entries[d];
+  await Store.set(KEY, JSON.stringify(entries));
+  render();
+  try{ await fetch(API_URL,{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({date:d})}); }catch{}
+}
+
+/* ---------- rendering ---------- */
+function sortedDates(){ return Object.keys(entries).sort(); }
+
+function render(){
+  renderChart();
+  renderPatterns();
+  renderHistory();
+}
+
+function renderChart(){
+  const dates = sortedDates().slice(-30);
+  const box = $("chart-empty");
+  if(dates.length < 2){ box.style.display="block"; if(chart){chart.destroy();chart=null;} return; }
+  box.style.display="none";
+  const labels = dates.map(d=> d.slice(5)); // MM-DD
+  const ds = (key,color)=>({label:key, data:dates.map(d=>entries[d][key]), borderColor:color, backgroundColor:color, tension:.3, pointRadius:3, borderWidth:2, spanGaps:true});
+  const cfg = {
+    type:"line",
+    data:{labels, datasets:[
+      ds("arm", getComputedStyle(document.body).getPropertyValue("--arm").trim()),
+      ds("leg", getComputedStyle(document.body).getPropertyValue("--leg").trim()),
+      ds("sleep", getComputedStyle(document.body).getPropertyValue("--sleep").trim())
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{enabled:true}},
+      scales:{ y:{min:0,max:10,grid:{color:"#e7e1d4"},ticks:{stepSize:2}}, x:{grid:{display:false}} }
+    }
+  };
+  if(chart) chart.destroy();
+  chart = new Chart($("chart"), cfg);
+}
+
+function avgFor(metric, actId, want){
+  const vals = sortedDates()
+    .filter(d=> !!(entries[d].activities && entries[d].activities[actId]) === want)
+    .map(d=> entries[d][metric]);
+  if(!vals.length) return null;
+  return vals.reduce((a,b)=>a+b,0)/vals.length;
+}
+function renderPatterns(){
+  const wrap = $("patterns"); wrap.innerHTML="";
+  const total = sortedDates().length;
+  if(total < 4){ wrap.innerHTML='<div class="empty">Keep logging — patterns appear once you have several days of data.</div>'; return; }
+  const watch = [["gym","Gym"],["heavywalk","Heavy walking"],["caffeine","Caffeine"],["bedex","Bedtime stretches"],["prone","Slept prone"]];
+  let any=false;
+  watch.forEach(([id,name])=>{
+    const onArm=avgFor("arm",id,true), offArm=avgFor("arm",id,false);
+    const onLeg=avgFor("leg",id,true), offLeg=avgFor("leg",id,false);
+    if(onArm==null || offArm==null) return; // need both groups present
+    any=true;
+    const armDelta=onArm-offArm, legDelta=onLeg-offLeg;
+    const tag=(delta)=>{
+      const cls = delta>0.5?"worse":delta<-0.5?"better":"flat";
+      const sign = delta>0?"+":"";
+      return `<span class="pdelta ${cls}">${sign}${delta.toFixed(1)}</span>`;
+    };
+    const row=document.createElement("div");
+    row.className="pattern";
+    row.innerHTML=`<div class="pn">${name}</div>
+      <div class="pv">arm <b>${onArm.toFixed(1)}</b> vs ${offArm.toFixed(1)} ${tag(armDelta)}<br>
+      leg <b>${onLeg.toFixed(1)}</b> vs ${offLeg.toFixed(1)} ${tag(legDelta)}</div>`;
+    wrap.appendChild(row);
+  });
+  if(!any) wrap.innerHTML='<div class="empty">Once you have some days with and some without each activity, comparisons show up here.</div>';
+}
+
+function renderHistory(){
+  const wrap=$("history"); wrap.innerHTML="";
+  const dates=sortedDates().reverse();
+  if(!dates.length){ wrap.innerHTML='<div class="empty">No entries yet.</div>'; return; }
+  dates.forEach(d=>{
+    const e=entries[d];
+    const acts=Object.keys(e.activities||{}).map(id=>{
+      const a=ACTIVITIES.find(x=>x.id===id); return a?a.label:id;
+    });
+    const row=document.createElement("div");
+    row.className="entry";
+    row.innerHTML=`<div class="ed">${d}</div>
+      <div class="escores">
+        <span class="pill"><i style="background:var(--arm)"></i>${e.arm}</span>
+        <span class="pill"><i style="background:var(--leg)"></i>${e.leg}</span>
+        <span class="pill"><i style="background:var(--sleep)"></i>${e.sleep}</span>
+        ${e.latency!=null?`<span>· ${e.latency}m to sleep</span>`:""}
+        ${acts.length?`<span>· ${acts.slice(0,3).join(", ")}${acts.length>3?"…":""}</span>`:""}
+      </div>
+      <button class="del" data-d="${d}">Delete</button>`;
+    row.addEventListener("click",ev=>{
+      if(ev.target.classList.contains("del")) return;
+      $("date").value=d; loadDate(); window.scrollTo({top:0,behavior:"smooth"});
+    });
+    row.querySelector(".del").addEventListener("click",()=>delEntry(d));
+    wrap.appendChild(row);
+  });
+}
+
+/* ---------- export / import ---------- */
+function download(name, text, type){
+  const blob=new Blob([text],{type}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=name; a.click(); URL.revokeObjectURL(url);
+}
+function exportCSV(){
+  const cols=["date","arm","leg","sleep","latency",...ACTIVITIES.map(a=>a.id),"notes"];
+  const rows=[cols.join(",")];
+  sortedDates().forEach(d=>{
+    const e=entries[d];
+    const r=[d,e.arm,e.leg,e.sleep,e.latency??"",
+      ...ACTIVITIES.map(a=>e.activities&&e.activities[a.id]?1:0),
+      '"'+(e.notes||"").replace(/"/g,'""')+'"'];
+    rows.push(r.join(","));
+  });
+  download("daily-tracker.csv", rows.join("\n"), "text/csv");
+}
+function exportJSON(){ download("daily-tracker-backup.json", JSON.stringify(entries,null,2), "application/json"); }
+function importJSON(file){
+  const fr=new FileReader();
+  fr.onload=async()=>{
+    try{
+      const data=JSON.parse(fr.result);
+      if(typeof data!=="object") throw 0;
+      if(confirm("Restore this backup? It will merge with current data.")){
+        entries={...entries,...data};
+        await Store.set(KEY, JSON.stringify(entries));
+        render(); loadDate(); alert("Restored ✓");
+      }
+    }catch{ alert("That file couldn't be read as a valid backup."); }
+  };
+  fr.readAsText(file);
+}
+
+/* ---------- Notion sync ---------- */
+function setStatus(state, msg){
+  const bar=$("syncbar");
+  bar.className="syncbar s-"+state;
+  $("syncmsg").textContent=msg;
+}
+function toApi(date,e){
+  return {date, arm:e.arm, leg:e.leg, sleep:e.sleep, latency:e.latency, notes:e.notes,
+    activities:Object.keys(e.activities||{}).map(labelOf)};
+}
+function fromApi(it){
+  const acts={};
+  (it.activities||[]).forEach(l=>{ const id=idOf(l); if(id) acts[id]=true; });
+  return {activities:acts, arm:it.arm??0, leg:it.leg??0, sleep:it.sleep??5,
+    latency:(it.latency==null)?null:it.latency, notes:it.notes||""};
+}
+async function syncFromServer(){
+  setStatus("syncing","Syncing with Notion…");
+  try{
+    const r=await fetch(API_URL,{cache:"no-store"});
+    if(!r.ok) throw new Error("server");
+    const data=await r.json();
+    if(data.error) throw new Error(data.error);
+    (data.entries||[]).forEach(it=>{ if(it.date) entries[it.date]=fromApi(it); }); // server wins
+    await Store.set(KEY, JSON.stringify(entries));
+    loadDate(); render();
+    setStatus("synced","Synced with Notion ✓");
+  }catch{
+    setStatus("error","Working offline — couldn't reach Notion. Saved locally.");
+  }
+}
+async function pushToServer(date,e){
+  const r=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(toApi(date,e))});
+  if(!r.ok) throw new Error("server");
+  const d=await r.json(); if(d.error) throw new Error(d.error);
+}
+
+/* ---------- wire up ---------- */
+function bindSlider(s,v){ $(s).addEventListener("input",()=> $(v).textContent=$(s).value); }
+async function init(){
+  buildChips();
+  bindSlider("s-arm","v-arm"); bindSlider("s-leg","v-leg"); bindSlider("s-sleep","v-sleep");
+  $("date").value=todayStr();
+  const raw=await Store.get(KEY);
+  if(raw){ try{ entries=JSON.parse(raw)||{}; }catch{ entries={}; } }
+  loadDate(); render();
+  syncFromServer();   // pull latest from Notion (updates UI when done)
+
+  $("date").addEventListener("change", loadDate);
+  $("save").addEventListener("click", save);
+  $("clearform").addEventListener("click", ()=>writeForm(null));
+  $("exp-csv").addEventListener("click", exportCSV);
+  $("exp-json").addEventListener("click", exportJSON);
+  $("imp-json").addEventListener("click", ()=>$("importfile").click());
+  $("importfile").addEventListener("change", e=>{ if(e.target.files[0]) importJSON(e.target.files[0]); });
+  $("clearall").addEventListener("click", async()=>{
+    if(confirm("Delete ALL entries? Make sure you have a backup first.")){
+      entries={}; await Store.set(KEY,JSON.stringify(entries)); render(); writeForm(null);
+    }
+  });
+}
+init();
+</script>
+</body>
+</html>
