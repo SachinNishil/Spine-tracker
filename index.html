@@ -4,12 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="theme-color" content="#1f6f63">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Tracker">
 <title>Daily Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,12 +38,9 @@
   header.app{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
   .title{font-family:"Fraunces",serif;font-weight:500;font-size:30px;letter-spacing:-.01em;line-height:1.05;margin:0}
   .title small{display:block;font-family:"Hanken Grotesk";font-weight:500;font-size:13px;color:var(--muted);letter-spacing:.02em;margin-top:4px}
-  .datebox{display:flex;align-items:center;gap:6px}
-  .daynav{font-family:inherit;font-size:20px;line-height:1;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:11px;width:38px;height:42px;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;padding:0}
-  .daynav:active{transform:scale(.95)}
-  .datepick{position:relative;font-family:inherit;font-size:15px;font-weight:700;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 14px;box-shadow:var(--shadow);cursor:pointer;min-width:118px;text-align:center}
-  .datepick .dpfmt{pointer-events:none}
-  .datepick input[type=date]{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:none;padding:0;margin:0;cursor:pointer}
+  .datebox{display:flex;align-items:center;gap:8px}
+  .datebox label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+  input[type=date]{font-family:inherit;font-size:15px;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 11px;box-shadow:var(--shadow)}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
   .card h2{font-family:"Fraunces",serif;font-weight:500;font-size:20px;margin:0 0 2px;letter-spacing:-.01em}
@@ -133,12 +124,8 @@
   <header class="app">
     <h1 class="title">Daily Tracker<small>Activities &amp; how the body responds</small></h1>
     <div class="datebox">
-      <button class="daynav" id="prevday" aria-label="Previous day">‹</button>
-      <button class="datepick" id="datepick">
-        <span class="dpfmt" id="datefmt">31-05-2026</span>
-        <input type="date" id="date">
-      </button>
-      <button class="daynav" id="nextday" aria-label="Next day">›</button>
+      <label for="date">Date</label>
+      <input type="date" id="date">
     </div>
   </header>
 
@@ -232,35 +219,25 @@
 
 <script>
 /* ---------- config: edit this list to add/remove things you track ---------- */
-// `label` = text on the chip. `tag` (optional) = the name stored in Notion;
-// it must be unique, so the two "Physio" chips get distinct tags behind the scenes.
 const ACTIVITIES = [
-  {id:"walk",       label:"Light walking",  grp:"move"},
-  {id:"heavywalk",  label:"Heavy walking",  grp:"move"},
-  {id:"gym",        label:"Gym",            grp:"move"},
-  {id:"physio_day", label:"Physio", tag:"Physio (day)", grp:"move"},
-  {id:"physio_bed", label:"Physio", tag:"Physio (bed)", grp:"bed"},
-  {id:"cerv_pillow", label:"Cervical pillow",            grp:"bed"},
-  {id:"shower",     label:"Shower",         grp:"bed"},
-  {id:"reading",    label:"Reading",        grp:"bed"},
-  {id:"caffeine",   label:"Caffeine",       grp:"other"},
-  {id:"omega",      label:"Omega-3",        grp:"other"},
-  {id:"magnesium",  label:"Magnesium",      grp:"other"},
-  {id:"ltheanine",  label:"L-Theanine",     grp:"other"},
+  {id:"walk",       label:"Walking",            grp:"move"},
+  {id:"heavywalk",  label:"Heavy walking / standing", grp:"move"},
+  {id:"gym",        label:"Gym",                grp:"move"},
+  {id:"swim",       label:"Swimming",           grp:"move"},
+  {id:"dayex",      label:"Daytime exercise",   grp:"move"},
+  {id:"bedex",      label:"Bedtime stretches",  grp:"bed"},
+  {id:"shower",     label:"Shower before bed",  grp:"bed"},
+  {id:"socks",      label:"Socks to bed",       grp:"bed"},
+  {id:"prone",      label:"Slept prone/freefall", grp:"bed"},
+  {id:"caffeine",   label:"Caffeine",           grp:"other"},
+  {id:"cald3",      label:"Calcium + D3",       grp:"other"},
+  {id:"omega",      label:"Omega-3",            grp:"other"},
 ];
 const KEY = "spine_tracker_entries_v1";
 const API_URL = "/api/entries";   // the Vercel serverless function (the "middleman")
 
 const labelOf = id => (ACTIVITIES.find(a=>a.id===id)||{}).label || id;
-const tagOf   = id => { const a=ACTIVITIES.find(x=>x.id===id)||{}; return a.tag || a.label || id; };
-const idOfTag = t  => { const a=ACTIVITIES.find(x=>(x.tag||x.label)===t); return a?a.id:null; };
-
-/* ---------- date helpers ---------- */
-const isoOf = dt => dt.toLocaleDateString("en-CA");            // -> YYYY-MM-DD (local)
-const yesterdayStr = () => { const d=new Date(); d.setDate(d.getDate()-1); return isoOf(d); };
-const fmtDMY = iso => { const [y,m,d]=iso.split("-"); return `${d}-${m}-${y}`; };   // -> DD-MM-YYYY
-const fmtDM  = iso => { const [,m,d]=iso.split("-"); return `${d}-${m}`; };          // -> DD-MM
-let currentDate = yesterdayStr();
+const idOf = label => (ACTIVITIES.find(a=>a.label===label)||{}).id || null;
 
 /* ---------- storage: works deployed (localStorage) and in Claude preview ---------- */
 const Store = {
@@ -282,6 +259,7 @@ let entries = {};   // { "YYYY-MM-DD": {activities:{}, arm, leg, sleep, latency,
 let chart = null;
 
 const $ = id => document.getElementById(id);
+const todayStr = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD local
 
 /* ---------- build the chips ---------- */
 function buildChips(){
@@ -315,24 +293,13 @@ function writeForm(e){
   $("latency").value = e && e.latency!=null ? e.latency : "";
   $("notes").value = e ? e.notes : "";
 }
-function setDate(iso){
-  currentDate = iso;
-  $("date").value = iso;
-  $("datefmt").textContent = fmtDMY(iso);
-  loadDate();
-}
-function shiftDate(days){
-  const d = new Date(currentDate+"T00:00:00");
-  d.setDate(d.getDate()+days);
-  setDate(isoOf(d));
-}
 function loadDate(){
-  writeForm(entries[currentDate] || null);
+  writeForm(entries[$("date").value] || null);
 }
 
 /* ---------- save / delete ---------- */
 async function save(){
-  const d = currentDate; if(!d) return;
+  const d = $("date").value; if(!d) return;
   entries[d] = readForm();
   await Store.set(KEY, JSON.stringify(entries));   // instant local save
   render();
@@ -342,7 +309,7 @@ async function save(){
   catch{ setStatus("error","Saved on this device — Notion sync failed, will retry next save."); }
 }
 async function delEntry(d){
-  if(!confirm("Delete the entry for "+fmtDMY(d)+"?")) return;
+  if(!confirm("Delete the entry for "+d+"?")) return;
   delete entries[d];
   await Store.set(KEY, JSON.stringify(entries));
   render();
@@ -363,7 +330,7 @@ function renderChart(){
   const box = $("chart-empty");
   if(dates.length < 2){ box.style.display="block"; if(chart){chart.destroy();chart=null;} return; }
   box.style.display="none";
-  const labels = dates.map(d=> fmtDM(d)); // DD-MM
+  const labels = dates.map(d=> d.slice(5)); // MM-DD
   const ds = (key,color)=>({label:key, data:dates.map(d=>entries[d][key]), borderColor:color, backgroundColor:color, tension:.3, pointRadius:3, borderWidth:2, spanGaps:true});
   const cfg = {
     type:"line",
@@ -393,7 +360,7 @@ function renderPatterns(){
   const wrap = $("patterns"); wrap.innerHTML="";
   const total = sortedDates().length;
   if(total < 4){ wrap.innerHTML='<div class="empty">Keep logging — patterns appear once you have several days of data.</div>'; return; }
-  const watch = [["gym","Gym"],["heavywalk","Heavy walking"],["physio_day","Physio (day)"],["caffeine","Caffeine"],["magnesium","Magnesium"]];
+  const watch = [["gym","Gym"],["heavywalk","Heavy walking"],["caffeine","Caffeine"],["bedex","Bedtime stretches"],["prone","Slept prone"]];
   let any=false;
   watch.forEach(([id,name])=>{
     const onArm=avgFor("arm",id,true), offArm=avgFor("arm",id,false);
@@ -423,11 +390,11 @@ function renderHistory(){
   dates.forEach(d=>{
     const e=entries[d];
     const acts=Object.keys(e.activities||{}).map(id=>{
-      const a=ACTIVITIES.find(x=>x.id===id); return a?(a.tag||a.label):id;
+      const a=ACTIVITIES.find(x=>x.id===id); return a?a.label:id;
     });
     const row=document.createElement("div");
     row.className="entry";
-    row.innerHTML=`<div class="ed">${fmtDMY(d)}</div>
+    row.innerHTML=`<div class="ed">${d}</div>
       <div class="escores">
         <span class="pill"><i style="background:var(--arm)"></i>${e.arm}</span>
         <span class="pill"><i style="background:var(--leg)"></i>${e.leg}</span>
@@ -438,7 +405,7 @@ function renderHistory(){
       <button class="del" data-d="${d}">Delete</button>`;
     row.addEventListener("click",ev=>{
       if(ev.target.classList.contains("del")) return;
-      setDate(d); window.scrollTo({top:0,behavior:"smooth"});
+      $("date").value=d; loadDate(); window.scrollTo({top:0,behavior:"smooth"});
     });
     row.querySelector(".del").addEventListener("click",()=>delEntry(d));
     wrap.appendChild(row);
@@ -487,11 +454,11 @@ function setStatus(state, msg){
 }
 function toApi(date,e){
   return {date, arm:e.arm, leg:e.leg, sleep:e.sleep, latency:e.latency, notes:e.notes,
-    activities:Object.keys(e.activities||{}).map(tagOf)};
+    activities:Object.keys(e.activities||{}).map(labelOf)};
 }
 function fromApi(it){
   const acts={};
-  (it.activities||[]).forEach(t=>{ const id=idOfTag(t); if(id) acts[id]=true; });
+  (it.activities||[]).forEach(l=>{ const id=idOf(l); if(id) acts[id]=true; });
   return {activities:acts, arm:it.arm??0, leg:it.leg??0, sleep:it.sleep??5,
     latency:(it.latency==null)?null:it.latency, notes:it.notes||""};
 }
@@ -521,16 +488,13 @@ function bindSlider(s,v){ $(s).addEventListener("input",()=> $(v).textContent=$(
 async function init(){
   buildChips();
   bindSlider("s-arm","v-arm"); bindSlider("s-leg","v-leg"); bindSlider("s-sleep","v-sleep");
+  $("date").value=todayStr();
   const raw=await Store.get(KEY);
   if(raw){ try{ entries=JSON.parse(raw)||{}; }catch{ entries={}; } }
-  setDate(currentDate);   // defaults to yesterday; loads its entry if any
-  render();
+  loadDate(); render();
   syncFromServer();   // pull latest from Notion (updates UI when done)
 
-  $("prevday").addEventListener("click", ()=>shiftDate(-1));
-  $("nextday").addEventListener("click", ()=>shiftDate(1));
-  $("datepick").addEventListener("click", ()=>{ const el=$("date"); if(el.showPicker){ try{el.showPicker();}catch{} } });
-  $("date").addEventListener("change", e=> setDate(e.target.value));
+  $("date").addEventListener("change", loadDate);
   $("save").addEventListener("click", save);
   $("clearform").addEventListener("click", ()=>writeForm(null));
   $("exp-csv").addEventListener("click", exportCSV);
@@ -544,11 +508,6 @@ async function init(){
   });
 }
 init();
-</script>
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
-}
 </script>
 </body>
 </html>
