@@ -107,9 +107,8 @@ input[type=number]{max-width:160px}
 .bub-sq.active-day.filled{border-color:var(--accent);color:#fff}
 .bub-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.03em;white-space:nowrap;line-height:1.2}
 .bnav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);z-index:100;box-shadow:0 -2px 12px rgba(32,33,29,.06)}
-.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0 max(14px,env(safe-area-inset-bottom));font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;transition:color .15s;position:relative}
-.bnav-item.active{color:var(--accent)}
-.bnav-item.active::before{content:"";position:absolute;top:6px;width:4px;height:4px;border-radius:50%;background:var(--accent)}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0 max(14px,env(safe-area-inset-bottom));font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;transition:color .15s,background .15s;position:relative;border-radius:0}
+.bnav-item.active{color:var(--accent);background:var(--accent-soft)}
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .cal-month{font-family:"Fraunces",serif;font-size:18px;font-weight:500}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
@@ -129,7 +128,7 @@ input[type=number]{max-width:160px}
 .ins-icon.neutral{background:var(--muted)}
 .ins-text{font-size:14px;line-height:1.55;padding-top:6px}
 footer.app-footer{text-align:center;font-size:12px;color:var(--muted);margin-top:24px;line-height:1.6}
-header.app{position:relative}
+header.app{position:relative;padding-right:44px}
 .kebab{position:absolute;top:0;right:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted);background:none;border:none;cursor:pointer;letter-spacing:2px;border-radius:10px;transition:background .15s}
 .kebab:active{background:var(--line)}
 .kebab .notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--arm);display:none}
@@ -543,6 +542,7 @@ const CHANGELOG=[
   {v:"1.2",date:"01-06-2026",changes:["Install as a standalone phone app (PWA). Offline support and scrollable date strip."]},
   {v:"2.0",date:"01-06-2026",changes:["Three-tab layout (Log, Insights, History). Calendar view and rule-based insights engine."]},
   {v:"2.1",date:"01-06-2026",changes:["Three-dot settings menu with version history and new-update notifications."]},
+  {v:"2.2",date:"01-06-2026",changes:["Active tab now highlighted with a box instead of a dot. Fixed kebab menu overlapping date arrows on desktop."]},
 ];
 const CURRENT_VER=CHANGELOG[CHANGELOG.length-1].v;
 function checkNotifDot(){
