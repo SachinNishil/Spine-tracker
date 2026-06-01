@@ -129,6 +129,29 @@ input[type=number]{max-width:160px}
 .ins-icon.neutral{background:var(--muted)}
 .ins-text{font-size:14px;line-height:1.55;padding-top:6px}
 footer.app-footer{text-align:center;font-size:12px;color:var(--muted);margin-top:24px;line-height:1.6}
+header.app{position:relative}
+.kebab{position:absolute;top:0;right:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--muted);background:none;border:none;cursor:pointer;letter-spacing:2px;border-radius:10px;transition:background .15s}
+.kebab:active{background:var(--line)}
+.kebab .notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--arm);display:none}
+.kebab .notif-dot.show{display:block}
+.dropdown{position:absolute;top:40px;right:0;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:170px;z-index:60;display:none;overflow:hidden}
+.dropdown.open{display:block}
+.dropdown-item{display:flex;align-items:center;justify-content:space-between;width:100%;padding:13px 16px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);background:none;border:none;cursor:pointer;text-align:left}
+.dropdown-item:active{background:var(--line)}
+.dropdown-item .badge{font-size:10px;font-weight:700;background:var(--arm);color:#fff;padding:2px 7px;border-radius:99px}
+.changelog-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;overflow-y:auto;display:none;-webkit-overflow-scrolling:touch}
+.changelog-overlay.open{display:block}
+.changelog-inner{max-width:680px;margin:0 auto;padding:22px 16px 60px}
+.changelog-header{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.changelog-back{font-family:inherit;font-size:14px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:8px 0}
+.changelog-title{font-family:"Fraunces",serif;font-size:24px;font-weight:500;margin:0}
+.ver-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.ver-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.ver-badge{font-family:"Fraunces",serif;font-size:15px;font-weight:600;background:var(--accent);color:#fff;padding:4px 12px;border-radius:99px}
+.ver-date{font-size:13px;color:var(--muted);font-weight:500}
+.ver-latest{font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:3px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.04em}
+.ver-list{margin:0;padding:0 0 0 18px;font-size:14px;line-height:1.7;color:var(--ink)}
+.ver-list li{margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -142,6 +165,10 @@ footer.app-footer{text-align:center;font-size:12px;color:var(--muted);margin-top
         <input type="date" id="date">
       </button>
       <button class="daynav" id="nextday" aria-label="Next day">&#8250;</button>
+    </div>
+    <button class="kebab" id="kebab" aria-label="Menu">&#8942;<span class="notif-dot" id="notif-dot"></span></button>
+    <div class="dropdown" id="dropdown">
+      <button class="dropdown-item" id="btn-changelog">New updates <span class="badge" id="ver-badge-nav" style="display:none">1</span></button>
     </div>
   </header>
   <div class="syncbar s-syncing" id="syncbar"><span class="syncdot"></span><span id="syncmsg">Connecting to Notion&hellip;</span></div>
@@ -248,6 +275,16 @@ footer.app-footer{text-align:center;font-size:12px;color:var(--muted);margin-top
   <button class="bnav-item" data-tab="tab-insights">Insights</button>
   <button class="bnav-item" data-tab="tab-history">History</button>
 </nav>
+
+<div class="changelog-overlay" id="changelog-overlay">
+  <div class="changelog-inner">
+    <div class="changelog-header">
+      <button class="changelog-back" id="changelog-back">&#8249; Back</button>
+      <h1 class="changelog-title">What's new</h1>
+    </div>
+    <div id="changelog-list"></div>
+  </div>
+</div>
 
 <script>
 const ACTIVITIES=[
@@ -500,6 +537,32 @@ function switchTab(tabId){
   if(tabId==="tab-history")renderCalendar();
 }
 
+const CHANGELOG=[
+  {v:"1.0",date:"01-06-2026",changes:["Daily activity and symptom logging with Notion sync, trend charts, and CSV export."]},
+  {v:"1.1",date:"01-06-2026",changes:["Date defaults to yesterday in DD-MM-YYYY format. Custom activities and lag-day pattern analysis."]},
+  {v:"1.2",date:"01-06-2026",changes:["Install as a standalone phone app (PWA). Offline support and scrollable date strip."]},
+  {v:"2.0",date:"01-06-2026",changes:["Three-tab layout (Log, Insights, History). Calendar view and rule-based insights engine."]},
+  {v:"2.1",date:"01-06-2026",changes:["Three-dot settings menu with version history and new-update notifications."]},
+];
+const CURRENT_VER=CHANGELOG[CHANGELOG.length-1].v;
+function checkNotifDot(){
+  try{const seen=localStorage.getItem("last_seen_ver");if(seen!==CURRENT_VER){$("notif-dot").classList.add("show");$("ver-badge-nav").style.display="inline";$("ver-badge-nav").textContent="new"}else{$("notif-dot").classList.remove("show");$("ver-badge-nav").style.display="none"}}catch{}
+}
+function markSeen(){try{localStorage.setItem("last_seen_ver",CURRENT_VER)}catch{};$("notif-dot").classList.remove("show");$("ver-badge-nav").style.display="none"}
+function toggleDropdown(){$("dropdown").classList.toggle("open")}
+function closeDropdown(){$("dropdown").classList.remove("open")}
+function openChangelog(){
+  closeDropdown();markSeen();
+  const list=$("changelog-list");list.innerHTML="";
+  [...CHANGELOG].reverse().forEach((entry,i)=>{
+    const card=document.createElement("div");card.className="ver-card";
+    card.innerHTML='<div class="ver-head"><span class="ver-badge">v'+entry.v+'</span><span class="ver-date">'+entry.date+'</span>'+(i===0?'<span class="ver-latest">latest</span>':"")+'</div><ul class="ver-list">'+entry.changes.map(c=>"<li>"+c+"</li>").join("")+"</ul>";
+    list.appendChild(card);
+  });
+  $("changelog-overlay").classList.add("open");
+}
+function closeChangelog(){$("changelog-overlay").classList.remove("open")}
+
 function bindSlider(s,v){$(s).addEventListener("input",()=>$(v).textContent=$(s).value)}
 async function init(){
   buildChips();
@@ -520,6 +583,11 @@ async function init(){
   $("cal-prev").addEventListener("click",()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--}renderCalendar()});
   $("cal-next").addEventListener("click",()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++}renderCalendar()});
   document.querySelectorAll(".bnav-item").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+  $("kebab").addEventListener("click",e=>{e.stopPropagation();toggleDropdown()});
+  $("btn-changelog").addEventListener("click",openChangelog);
+  $("changelog-back").addEventListener("click",closeChangelog);
+  document.addEventListener("click",e=>{if(!$("dropdown").contains(e.target)&&e.target!==$("kebab"))closeDropdown()});
+  checkNotifDot();
 }
 init();
 </script>
