@@ -111,7 +111,7 @@ input[type=number]{max-width:160px}
 .bnav-item.active{color:var(--accent);background:var(--accent-soft)}
 .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .cal-month{font-family:"Fraunces",serif;font-size:18px;font-weight:500}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;overflow:hidden}
 .cal-dow{font-size:10px;font-weight:700;color:var(--muted);text-align:center;padding:4px 0;text-transform:uppercase;letter-spacing:.05em}
 .cal-day{aspect-ratio:1;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--muted);background:var(--card);border:1px solid var(--line);cursor:pointer;transition:transform .1s}
 .cal-day:active{transform:scale(.93)}
@@ -543,6 +543,7 @@ const CHANGELOG=[
   {v:"2.0",date:"01-06-2026",changes:["Three-tab layout (Log, Insights, History). Calendar view and rule-based insights engine."]},
   {v:"2.1",date:"01-06-2026",changes:["Three-dot settings menu with version history and new-update notifications."]},
   {v:"2.2",date:"01-06-2026",changes:["Active tab now highlighted with a box instead of a dot. Fixed kebab menu overlapping date arrows on desktop."]},
+  {v:"2.3",date:"01-06-2026",changes:["Fixed calendar Sunday column getting cut off on mobile."]},
 ];
 const CURRENT_VER=CHANGELOG[CHANGELOG.length-1].v;
 function checkNotifDot(){
