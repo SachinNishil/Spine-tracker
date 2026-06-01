@@ -235,7 +235,7 @@
 // `label` = text on the chip. `tag` (optional) = the name stored in Notion;
 // it must be unique, so the two "Physio" chips get distinct tags behind the scenes.
 const ACTIVITIES = [
-  {id:"walk",       label:"Walking (<6K)",  grp:"move"},
+  {id:"walk",       label:"Light walking",  grp:"move"},
   {id:"heavywalk",  label:"Heavy walking",  grp:"move"},
   {id:"gym",        label:"Gym",            grp:"move"},
   {id:"physio_day", label:"Physio", tag:"Physio (day)", grp:"move"},
@@ -335,7 +335,6 @@ async function save(){
   entries[d] = readForm();
   await Store.set(KEY, JSON.stringify(entries));   // instant local save
   render();
-  writeForm(null);   // reset the form for the next entry
   const n = $("savednote"); n.classList.add("show"); setTimeout(()=>n.classList.remove("show"), 1600);
   setStatus("syncing","Saving to Notion…");
   try{ await pushToServer(d, entries[d]); setStatus("synced","Synced with Notion ✓"); }
