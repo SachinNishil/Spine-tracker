@@ -126,16 +126,28 @@
   .syncbar.s-error{color:#b6493a} .syncbar.s-error .syncdot{background:#b6493a}
   footer{text-align:center;font-size:12px;color:var(--muted);margin-top:24px;line-height:1.6}
 
-  .week-strip{display:flex;justify-content:flex-start;align-items:flex-start;gap:8px;margin-bottom:16px}
-  .bub-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;width:44px;flex-shrink:0}
-  .bub-outer{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex-shrink:0}
-  .bub-outer.filled{background:var(--accent);border-color:var(--accent)}
-  .bub-outer.active-day{outline:2px solid var(--accent);outline-offset:2px}
-  .bub-outer.active-day.empty{outline-color:var(--muted)}
-  .bub-outer:active{transform:scale(.93)}
-  .bub{font-size:13px;font-weight:600;color:var(--muted);line-height:1;pointer-events:none}
-  .bub-outer.filled .bub{color:#fff}
-  .bub-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.03em}
+  .week-strip{
+    display:flex;
+    gap:6px;
+    margin-bottom:16px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior-x:contain;
+    scrollbar-width:none;
+    touch-action:pan-x;
+    cursor:grab;
+    user-select:none;
+  }
+  .week-strip::-webkit-scrollbar{display:none}
+  .week-strip.dragging{cursor:grabbing}
+  .bub-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex:0 0 auto}
+  .bub-sq{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--muted);transition:transform .1s}
+  .bub-sq:active{transform:scale(.95)}
+  .bub-sq.filled{background:var(--accent);border-color:var(--accent);color:#fff}
+  .bub-sq.active-day{border:2px solid var(--accent);color:var(--accent)}
+  .bub-sq.active-day.filled{color:#fff}
+  .bub-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.03em;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -531,34 +543,116 @@ async function pushToServer(date,e){
   const d=await r.json(); if(d.error) throw new Error(d.error);
 }
 
-/* ---------- week strip ---------- */
-function buildWeekStrip(){
-  const strip=$("week-strip"); strip.innerHTML="";
+/* ---------- date strip ---------- */
+let dateStripDragReady=false;
+const DATE_TILE_WIDTH=44;       // 38px tile + 6px gap
+const MOBILE_DATE_TILES=60;     // enough history to swipe through on mobile
+
+function dateStripCount(){
+  const strip=$("week-strip");
+  if(!strip) return 7;
+
+  // On mobile, render more dates and let the user drag-scroll backwards.
+  if(window.matchMedia("(max-width: 760px)").matches) return MOBILE_DATE_TILES;
+
+  // On desktop, render only as many tiles as fit in the available width.
+  const width=strip.clientWidth || 680;
+  return Math.max(7, Math.floor((width + 6) / DATE_TILE_WIDTH));
+}
+
+function dateLabel(d, offset){
   const DAY_SHORT=["sun","mon","tue","wed","thu","fri","sat"];
-  for(let i=6;i>=0;i--){
-    const d=new Date(); d.setDate(d.getDate()-i);
+  if(offset===1) return "tmrw";
+  if(offset===0) return "today";
+  if(offset===-1) return "yday";
+  return DAY_SHORT[d.getDay()];
+}
+
+function buildWeekStrip(){
+  const strip=$("week-strip");
+  strip.innerHTML="";
+
+  const count=dateStripCount();
+  const startOffset=2-count; // oldest visible date
+  const endOffset=1;         // tomorrow, always rightmost
+
+  for(let offset=startOffset; offset<=endOffset; offset++){
+    const d=new Date();
+    d.setHours(12,0,0,0);
+    d.setDate(d.getDate()+offset);
+
     const iso=isoOf(d);
     const filled=!!entries[iso];
     const isActive=iso===currentDate;
 
-    const wrap=document.createElement("div"); wrap.className="bub-wrap";
+    const wrap=document.createElement("div");
+    wrap.className="bub-wrap";
 
     const outer=document.createElement("div");
-    outer.className="bub-outer"+(filled?" filled":" empty")+(isActive?" active-day":"");
-    
+    outer.className="bub-sq"+(filled?" filled":" empty")+(isActive?" active-day":"");
 
     const num=document.createElement("span");
-    num.className="bub";
+    num.className="bub-num";
     num.textContent=String(d.getDate()).padStart(2,"0");
 
-    const lbl=document.createElement("div"); lbl.className="bub-label";
-    lbl.textContent=i===0?"today":DAY_SHORT[d.getDay()];
+    const lbl=document.createElement("div");
+    lbl.className="bub-label";
+    lbl.textContent=dateLabel(d, offset);
 
     outer.appendChild(num);
-    wrap.appendChild(outer); wrap.appendChild(lbl);
+    wrap.appendChild(outer);
+    wrap.appendChild(lbl);
     wrap.addEventListener("click",()=>{ setDate(iso); window.scrollTo({top:0,behavior:"smooth"}); });
     strip.appendChild(wrap);
   }
+
+  // On mobile, start scrolled to the latest dates, so tomorrow is visible on the right.
+  requestAnimationFrame(()=>{ strip.scrollLeft=strip.scrollWidth; });
+  enableDateStripDrag();
+}
+
+function enableDateStripDrag(){
+  const strip=$("week-strip");
+  if(dateStripDragReady || !strip) return;
+  dateStripDragReady=true;
+
+  let isDown=false, startX=0, scrollLeft=0, moved=false;
+
+  strip.addEventListener("pointerdown", e=>{
+    isDown=true;
+    moved=false;
+    strip.classList.add("dragging");
+    startX=e.clientX;
+    scrollLeft=strip.scrollLeft;
+  });
+
+  strip.addEventListener("pointermove", e=>{
+    if(!isDown) return;
+    const dx=e.clientX-startX;
+    if(Math.abs(dx)>3) moved=true;
+    strip.scrollLeft=scrollLeft-dx;
+  });
+
+  const endDrag=()=>{
+    isDown=false;
+    strip.classList.remove("dragging");
+    setTimeout(()=>{ moved=false; }, 0);
+  };
+
+  strip.addEventListener("pointerup", endDrag);
+  strip.addEventListener("pointerleave", endDrag);
+
+  strip.addEventListener("click", e=>{
+    if(moved){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
+  window.addEventListener("resize", ()=>{
+    clearTimeout(window.__dateStripResizeTimer);
+    window.__dateStripResizeTimer=setTimeout(buildWeekStrip, 120);
+  });
 }
 
 /* ---------- wire up ---------- */
