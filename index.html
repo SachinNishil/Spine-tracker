@@ -138,7 +138,7 @@
     touch-action:pan-x;
     cursor:grab;
     user-select:none;
-    padding:3px 0;
+    padding:5px 0 3px;
   }
   .week-strip::-webkit-scrollbar{display:none}
   .week-strip.dragging{cursor:grabbing}
@@ -224,8 +224,8 @@
       <input type="range" class="leg" id="s-leg" min="0" max="10" value="0">
     </div>
     <div class="slider-row">
-      <div class="slider-head"><span class="name">Sleep quality</span><span class="ends">1 poor · 10 great</span><span class="val sleep" id="v-sleep">5</span></div>
-      <input type="range" class="sleep" id="s-sleep" min="1" max="10" value="5">
+      <div class="slider-head"><span class="name">Sleep quality</span><span class="ends">1 poor · 10 great</span><span class="val sleep" id="v-sleep">0</span></div>
+      <input type="range" class="sleep" id="s-sleep" min="0" max="10" value="0">
     </div>
 
     <div class="field">
@@ -261,7 +261,7 @@
   <!-- PATTERNS -->
   <section class="card">
     <h2>Patterns</h2>
-    <p class="sub">Average symptom score on days you did each thing vs days you didn't. (Needs ~7+ logged days to mean much.)</p>
+    <p class="sub">Arm / leg compare what you did the previous day. Sleep quality and time to fall asleep compare what you did the same day. (Needs ~7+ logged days to mean much.)</p>
     <div id="patterns"></div>
   </section>
 
@@ -290,10 +290,11 @@
 // `label` = text on the chip. `tag` (optional) = the name stored in Notion;
 // it must be unique, so the two "Physio" chips get distinct tags behind the scenes.
 const ACTIVITIES = [
+  {id:"physio_day", label:"Physio", tag:"Physio (day)", grp:"move"},
   {id:"walk",       label:"Light walking",  grp:"move"},
+  {id:"mini_workout", label:"Mini workout", grp:"move"},
   {id:"heavywalk",  label:"Heavy walking",  grp:"move"},
   {id:"gym",        label:"Gym",            grp:"move"},
-  {id:"physio_day", label:"Physio", tag:"Physio (day)", grp:"move"},
   {id:"physio_bed", label:"Physio", tag:"Physio (bed)", grp:"bed"},
   {id:"cerv_pillow", label:"Cervical pillow",            grp:"bed"},
   {id:"shower",     label:"Shower",         grp:"bed"},
@@ -366,7 +367,7 @@ function writeForm(e){
   document.querySelectorAll(".chip").forEach(c=> c.classList.toggle("on", !!(e && e.activities && e.activities[c.dataset.id])));
   $("s-arm").value = e ? e.arm : 0;       $("v-arm").textContent = e ? e.arm : 0;
   $("s-leg").value = e ? e.leg : 0;       $("v-leg").textContent = e ? e.leg : 0;
-  $("s-sleep").value = e ? e.sleep : 5;   $("v-sleep").textContent = e ? e.sleep : 5;
+  $("s-sleep").value = e ? e.sleep : 0;   $("v-sleep").textContent = e ? e.sleep : 0;
   $("latency").value = e && e.latency!=null ? e.latency : "";
   $("notes").value = e ? e.notes : "";
 }
@@ -439,37 +440,76 @@ function renderChart(){
   chart = new Chart($("chart"), cfg);
 }
 
-function avgFor(metric, actId, want){
+function dateShift(iso, days){
+  const d=new Date(iso+"T12:00:00");
+  d.setDate(d.getDate()+days);
+  return isoOf(d);
+}
+
+// lagDays = 1 means: compare today's outcome against yesterday's activity.
+// lagDays = 0 means: compare today's outcome against today's activity.
+function avgForOutcome(metric, actId, want, lagDays){
   const vals = sortedDates()
-    .filter(d=> !!(entries[d].activities && entries[d].activities[actId]) === want)
-    .map(d=> entries[d][metric]);
+    .filter(d=>{
+      const activityDate = dateShift(d, -lagDays);
+      const activityEntry = entries[activityDate];
+      if(!activityEntry) return false;
+      return !!(activityEntry.activities && activityEntry.activities[actId]) === want;
+    })
+    .map(d=> entries[d][metric])
+    .filter(v=> v!=null && !Number.isNaN(v));
+
   if(!vals.length) return null;
   return vals.reduce((a,b)=>a+b,0)/vals.length;
 }
+
 function renderPatterns(){
   const wrap = $("patterns"); wrap.innerHTML="";
   const total = sortedDates().length;
   if(total < 4){ wrap.innerHTML='<div class="empty">Keep logging — patterns appear once you have several days of data.</div>'; return; }
-  const watch = [["gym","Gym"],["heavywalk","Heavy walking"],["physio_day","Physio (day)"],["caffeine","Caffeine"],["magnesium","Magnesium"]];
+
+  const watch = [["physio_day","Physio (day)"],["walk","Light walking"],["mini_workout","Mini workout"],["heavywalk","Heavy walking"],["gym","Gym"],["caffeine","Caffeine"],["magnesium","Magnesium"]];
   let any=false;
+
+  const tag=(delta, lowerIsBetter=false)=>{
+    const effective = lowerIsBetter ? -delta : delta;
+    const cls = effective<-0.5?"worse":effective>0.5?"better":"flat";
+    const sign = delta>0?"+":"";
+    return `<span class="pdelta ${cls}">${sign}${delta.toFixed(1)}</span>`;
+  };
+
   watch.forEach(([id,name])=>{
-    const onArm=avgFor("arm",id,true), offArm=avgFor("arm",id,false);
-    const onLeg=avgFor("leg",id,true), offLeg=avgFor("leg",id,false);
-    if(onArm==null || offArm==null) return; // need both groups present
+    // Arm and leg are next-day outcomes from the previous day's activity.
+    const onArm=avgForOutcome("arm",id,true,1), offArm=avgForOutcome("arm",id,false,1);
+    const onLeg=avgForOutcome("leg",id,true,1), offLeg=avgForOutcome("leg",id,false,1);
+
+    // Sleep quality and latency are same-day outcomes from the same day's activity.
+    const onSleep=avgForOutcome("sleep",id,true,0), offSleep=avgForOutcome("sleep",id,false,0);
+    const onLatency=avgForOutcome("latency",id,true,0), offLatency=avgForOutcome("latency",id,false,0);
+
+    if(onArm==null || offArm==null || onLeg==null || offLeg==null) return; // need both groups present
     any=true;
-    const armDelta=onArm-offArm, legDelta=onLeg-offLeg;
-    const tag=(delta)=>{
-      const cls = delta>0.5?"worse":delta<-0.5?"better":"flat";
-      const sign = delta>0?"+":"";
-      return `<span class="pdelta ${cls}">${sign}${delta.toFixed(1)}</span>`;
-    };
+
+    const sleepLine = (onSleep!=null && offSleep!=null)
+      ? `<br>sleep <b>${onSleep.toFixed(1)}</b> vs ${offSleep.toFixed(1)} ${tag(onSleep-offSleep)}`
+      : "";
+
+    const latencyLine = (onLatency!=null && offLatency!=null)
+      ? `<br>fall asleep <b>${Math.round(onLatency)}m</b> vs ${Math.round(offLatency)}m ${tag(onLatency-offLatency,true)}`
+      : "";
+
     const row=document.createElement("div");
     row.className="pattern";
     row.innerHTML=`<div class="pn">${name}</div>
-      <div class="pv">arm <b>${onArm.toFixed(1)}</b> vs ${offArm.toFixed(1)} ${tag(armDelta)}<br>
-      leg <b>${onLeg.toFixed(1)}</b> vs ${offLeg.toFixed(1)} ${tag(legDelta)}</div>`;
+      <div class="pv">
+        prev day → arm <b>${onArm.toFixed(1)}</b> vs ${offArm.toFixed(1)} ${tag(onArm-offArm,true)}<br>
+        prev day → leg <b>${onLeg.toFixed(1)}</b> vs ${offLeg.toFixed(1)} ${tag(onLeg-offLeg,true)}
+        ${sleepLine}
+        ${latencyLine}
+      </div>`;
     wrap.appendChild(row);
   });
+
   if(!any) wrap.innerHTML='<div class="empty">Once you have some days with and some without each activity, comparisons show up here.</div>';
 }
 
@@ -549,7 +589,7 @@ function toApi(date,e){
 function fromApi(it){
   const acts={};
   (it.activities||[]).forEach(t=>{ const id=idOfTag(t); if(id) acts[id]=true; });
-  return {activities:acts, arm:it.arm??0, leg:it.leg??0, sleep:it.sleep??5,
+  return {activities:acts, arm:it.arm??0, leg:it.leg??0, sleep:it.sleep??0,
     latency:(it.latency==null)?null:it.latency, notes:it.notes||""};
 }
 async function syncFromServer(){
