@@ -85,15 +85,22 @@ input[type=number]{max-width:160px}
 .pat-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
 .pat-name{font-weight:700;font-size:15px}
 .pat-count{font-size:11px;color:var(--muted);font-weight:500;white-space:nowrap}
-.pm{display:flex;align-items:center;gap:10px;padding:5px 0}
-.pm-label{font-size:13px;color:var(--ink);width:104px;flex-shrink:0}
-.pm-verdict{font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;text-transform:capitalize}
-.pm-verdict.worse{background:#f6e3de;color:#a8392a}
-.pm-verdict.better{background:var(--accent-soft);color:var(--accent)}
-.pm-verdict.flat{background:#ece8de;color:var(--muted)}
-.pm-nums{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.pm{display:flex;align-items:center;gap:8px;padding:5px 0}
+.pm-label{font-size:12px;color:var(--muted);width:54px;flex-shrink:0}
+.pm-bar{flex:1;position:relative;height:8px;background:var(--line);border-radius:99px}
+.pm-center{position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(32,33,29,.2)}
+.pm-fill{position:absolute;top:0;bottom:0;border-radius:99px}
+.pm-num{width:46px;text-align:right;font-size:12px;font-weight:600;flex-shrink:0}
 .show-more{display:block;width:100%;margin-top:14px;font-family:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--line);border-radius:10px;padding:11px;cursor:pointer}
 .show-more:active{transform:scale(.98)}
+.hh-group{margin-bottom:14px}
+.hh-group:last-child{margin-bottom:0}
+.hh-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:6px}
+.hh-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.hh-item{padding:8px 0;border-top:1px solid var(--line)}
+.hh-item:first-of-type{border-top:none}
+.hh-name{font-weight:600;font-size:13px}
+.hh-detail{color:var(--muted);font-size:12px}
 .entry{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .entry:last-child{border-bottom:none}
 .entry:active{opacity:.6}
@@ -241,6 +248,16 @@ header.app{position:relative;padding-right:44px}
       <div class="glance-grid" id="glance"></div>
     </section>
     <section class="card">
+      <h2>What helps &amp; what worsens</h2>
+      <p class="sub">Activities grouped by their overall effect on your symptoms and sleep.</p>
+      <div id="helpshurts"></div>
+    </section>
+    <section class="card">
+      <h2>Activity impact</h2>
+      <p class="sub">How each activity shifts each outcome (same day). Bar left = <span style="color:#bf4a31">worse</span>, right = <span style="color:var(--accent)">better</span>.</p>
+      <div id="patterns"></div>
+    </section>
+    <section class="card">
       <h2>Trends</h2>
       <p class="sub">Tap a label to show or hide that line.</p>
       <div class="legend">
@@ -252,13 +269,8 @@ header.app{position:relative;padding-right:44px}
       <div class="empty" id="chart-empty" style="display:none">Log a few days and your trend lines will appear here.</div>
     </section>
     <section class="card">
-      <h2>Patterns</h2>
-      <p class="sub">Each activity compared on days you did it vs days you didn't (same day). <span style="color:var(--accent)">Better</span> / <span style="color:#a8392a">worse</span> shows the effect.</p>
-      <div id="patterns"></div>
-    </section>
-    <section class="card">
-      <h2>Insights</h2>
-      <p class="sub">Observations spotted in your data.</p>
+      <h2>Observations</h2>
+      <p class="sub">Trends and streaks spotted in your data.</p>
       <div id="insights"></div>
     </section>
   </div>
@@ -392,7 +404,7 @@ async function delEntry(d){
 }
 
 function sortedDates(){return Object.keys(entries).sort()}
-function render(){buildWeekStrip();renderChart();renderWeekGlance();renderPatterns();renderInsights();renderCalendar();renderHistory()}
+function render(){buildWeekStrip();renderChart();renderWeekGlance();renderHelpsHurts();renderPatterns();renderInsights();renderCalendar();renderHistory()}
 
 function renderWeekGlance(){
   const wrap=$("glance");if(!wrap)return;
@@ -434,36 +446,79 @@ function avgForOutcome(metric,actId,want,lagDays){
   if(!vals.length)return null;return vals.reduce((a,b)=>a+b,0)/vals.length;
 }
 
+const PMETRICS=[
+  {key:"arm",label:"Arm",higherBetter:false,mins:false,word:"arm"},
+  {key:"leg",label:"Leg",higherBetter:false,mins:false,word:"leg"},
+  {key:"sleep",label:"Sleep",higherBetter:true,mins:false,word:"sleep"},
+  {key:"latency",label:"Time",higherBetter:false,mins:true,word:"falling asleep"},
+];
+function activityEffects(id){
+  const out=[];let net=0;
+  PMETRICS.forEach(m=>{
+    const on=avgForOutcome(m.key,id,true,0),off=avgForOutcome(m.key,id,false,0);
+    if(on==null||off==null)return;
+    const diff=on-off;const thresh=m.mins?0.5:0.05;
+    const better=m.higherBetter?diff>0:diff<0;
+    const sig=Math.abs(diff)>=thresh;
+    out.push({m,on,off,diff,better,sig});
+    if(sig)net+=(m.mins?Math.abs(diff)/10:Math.abs(diff))*(better?1:-1);
+  });
+  return{out,net};
+}
+function joinWords(a){if(a.length<=1)return a.join("");if(a.length===2)return a[0]+" & "+a[1];return a.slice(0,-1).join(", ")+" & "+a[a.length-1]}
+
+function renderHelpsHurts(){
+  const wrap=$("helpshurts");if(!wrap)return;wrap.innerHTML="";const total=sortedDates().length;
+  if(total<4){wrap.innerHTML='<div class="empty">Keep logging \u2014 this fills in with more data.</div>';return}
+  const helps=[],hurts=[];
+  ACTIVITIES.forEach(a=>{
+    const withN=sortedDates().filter(d=>entries[d].activities&&entries[d].activities[a.id]).length;
+    const woN=sortedDates().filter(d=>!(entries[d].activities&&entries[d].activities[a.id])).length;
+    if(withN<1||woN<1)return;
+    const {out,net}=activityEffects(a.id);
+    const sigEffects=out.filter(e=>e.sig);
+    if(!sigEffects.length||Math.abs(net)<0.05)return;
+    const betterW=sigEffects.filter(e=>e.better).map(e=>e.m.word);
+    const worseW=sigEffects.filter(e=>!e.better).map(e=>e.m.word);
+    let detail;
+    if(net>0)detail=joinWords(betterW)+" better"+(worseW.length?" \u00b7 "+joinWords(worseW)+" worse":"");
+    else detail=joinWords(worseW)+" worse"+(betterW.length?" \u00b7 "+joinWords(betterW)+" better":"");
+    const item={name:tagOf(a.id),detail,net:Math.abs(net)};
+    (net>0?helps:hurts).push(item);
+  });
+  helps.sort((a,b)=>b.net-a.net);hurts.sort((a,b)=>b.net-a.net);
+  const group=(title,color,arr)=>{
+    let h='<div class="hh-group"><div class="hh-head"><span class="hh-dot" style="background:'+color+'"></span><span style="color:'+color+'">'+title+'</span></div>';
+    if(!arr.length)h+='<div class="hh-detail" style="padding:4px 0">Nothing clear yet.</div>';
+    else arr.forEach(it=>{h+='<div class="hh-item"><span class="hh-name">'+it.name+'</span><span class="hh-detail"> \u2014 '+it.detail+'</span></div>'});
+    return h+"</div>";
+  };
+  if(!helps.length&&!hurts.length){wrap.innerHTML='<div class="empty">No clear effects yet \u2014 keep logging.</div>';return}
+  wrap.innerHTML=group("Seems to help",getComputedStyle(document.body).getPropertyValue("--accent").trim(),helps)+group("Seems to worsen","#bf4a31",hurts);
+}
+
 function renderPatterns(){
   const wrap=$("patterns");wrap.innerHTML="";const total=sortedDates().length;
   if(total<4){wrap.innerHTML='<div class="empty">Keep logging \u2014 patterns appear with more data.</div>';return}
-  const watch=ACTIVITIES.map(a=>[a.id,tagOf(a.id)]);
-  const metrics=[
-    {key:"arm",label:"Arm symptoms",higherBetter:false,mins:false},
-    {key:"leg",label:"Leg symptoms",higherBetter:false,mins:false},
-    {key:"sleep",label:"Sleep quality",higherBetter:true,mins:false},
-    {key:"latency",label:"Time to sleep",higherBetter:false,mins:true},
-  ];
   const items=[];
-  watch.forEach(([id,name])=>{
+  ACTIVITIES.forEach(a=>{
+    const id=a.id,name=tagOf(id);
     const withN=sortedDates().filter(d=>entries[d].activities&&entries[d].activities[id]).length;
     const woN=sortedDates().filter(d=>!(entries[d].activities&&entries[d].activities[id])).length;
     if(withN<1||woN<1)return;
-    const rows=[];let strength=0;
-    metrics.forEach(m=>{
-      const on=avgForOutcome(m.key,id,true,0),off=avgForOutcome(m.key,id,false,0);
-      if(on==null||off==null)return;
-      const diff=on-off;const thresh=m.mins?0.5:0.05;
-      const improves=m.higherBetter?diff>0:diff<0;
-      let cls="flat",verdict="similar";
-      if(Math.abs(diff)>=thresh){cls=improves?"better":"worse";verdict=improves?"better":"worse"}
-      if(!m.mins)strength+=Math.abs(diff);
-      const fmt=v=>m.mins?Math.round(v)+"m":v.toFixed(1);
-      rows.push('<div class="pm"><span class="pm-label">'+m.label+'</span><span class="pm-verdict '+cls+'">'+verdict+'</span><span class="pm-nums">'+fmt(on)+' vs '+fmt(off)+'</span></div>');
-    });
-    if(!rows.length)return;
+    const {out}=activityEffects(id);
+    if(!out.length)return;let strength=0;
+    const rows=out.map(e=>{
+      const m=e.m;const pct=Math.min(Math.abs(e.diff)/(m.mins?20:3),1)*50;
+      const color=e.sig?(e.better?getComputedStyle(document.body).getPropertyValue("--accent").trim():"#bf4a31"):"var(--muted)";
+      const side=e.better?"left:50%":"right:50%";
+      const fill=e.sig?'<div class="pm-fill" style="'+side+';width:'+pct.toFixed(0)+'%;background:'+color+'"></div>':"";
+      const num=m.mins?((e.diff>=0?"+":"")+Math.round(e.diff)+"m"):((e.diff>=0?"+":"")+e.diff.toFixed(1));
+      if(!m.mins)strength+=Math.abs(e.diff);
+      return '<div class="pm"><span class="pm-label">'+m.label+'</span><div class="pm-bar"><div class="pm-center"></div>'+fill+'</div><span class="pm-num" style="color:'+color+'">'+num+'</span></div>';
+    }).join("");
     const card=document.createElement("div");card.className="pat";
-    card.innerHTML='<div class="pat-head"><span class="pat-name">'+name+'</span><span class="pat-count">'+withN+' with \u00b7 '+woN+' without</span></div>'+rows.join("");
+    card.innerHTML='<div class="pat-head"><span class="pat-name">'+name+'</span><span class="pat-count">'+withN+' with \u00b7 '+woN+' without</span></div>'+rows;
     items.push({card,strength});
   });
   if(!items.length){wrap.innerHTML='<div class="empty">Need days with and without each activity to compare.</div>';return}
@@ -491,14 +546,6 @@ function renderInsights(){
     if(rSl>pSl+0.5)ins.push({i:"ti-moon",t:"Sleep quality up from "+pSl.toFixed(1)+" to "+rSl.toFixed(1)+" this week.",c:"positive"});
     else if(rSl<pSl-0.5)ins.push({i:"ti-moon-off",t:"Sleep quality dropped from "+pSl.toFixed(1)+" to "+rSl.toFixed(1)+" this week.",c:"negative"});
   }
-  ACTIVITIES.forEach(a=>{
-    const on=avgForOutcome("arm",a.id,true,0),off=avgForOutcome("arm",a.id,false,0);
-    if(on!=null&&off!=null){const d=on-off;if(d>1.5)ins.push({i:"ti-alert-triangle",t:"On "+tagOf(a.id)+" days, arm symptoms average "+d.toFixed(1)+" higher.",c:"negative"});
-    else if(d<-1.5)ins.push({i:"ti-thumb-up",t:"On "+tagOf(a.id)+" days, arm symptoms average "+Math.abs(d).toFixed(1)+" lower.",c:"positive"})}
-    const onS=avgForOutcome("sleep",a.id,true,0),offS=avgForOutcome("sleep",a.id,false,0);
-    if(onS!=null&&offS!=null){const d=onS-offS;if(d>1)ins.push({i:"ti-moon",t:"Sleep is "+d.toFixed(1)+" points better on "+tagOf(a.id)+" days.",c:"positive"});
-    else if(d<-1)ins.push({i:"ti-mood-sad",t:"Sleep is "+Math.abs(d).toFixed(1)+" points worse on "+tagOf(a.id)+" days.",c:"negative"})}
-  });
   let streak=0;const dd=new Date();
   while(true){const iso=isoOf(dd);if(entries[iso]){streak++;dd.setDate(dd.getDate()-1)}else break}
   if(streak>=7)ins.push({i:"ti-flame",t:streak+"-day logging streak! More data = more reliable patterns.",c:"positive"});
@@ -626,6 +673,7 @@ const CHANGELOG=[
   {v:"2.4",date:"01-06-2026",changes:["Arm and leg symptoms now compared same-day. Clearer Patterns layout and a floating nav bar on desktop."]},
   {v:"2.5",date:"01-06-2026",changes:["Redesigned bottom nav with icons. Added 'This week at a glance' summary and tap-to-toggle chart lines."]},
   {v:"2.6",date:"01-06-2026",changes:["Removed date bar from Insights and History. Patterns now flag any difference and show top 3 with a 'show more' option."]},
+  {v:"2.7",date:"01-06-2026",changes:["New 'What helps & worsens' summary and visual impact bars in Insights."]},
 ];
 const CURRENT_VER=CHANGELOG[CHANGELOG.length-1].v;
 function checkNotifDot(){
