@@ -92,6 +92,8 @@ input[type=number]{max-width:160px}
 .pm-verdict.better{background:var(--accent-soft);color:var(--accent)}
 .pm-verdict.flat{background:#ece8de;color:var(--muted)}
 .pm-nums{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.show-more{display:block;width:100%;margin-top:14px;font-family:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--line);border-radius:10px;padding:11px;cursor:pointer}
+.show-more:active{transform:scale(.98)}
 .entry{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .entry:last-child{border-bottom:none}
 .entry:active{opacity:.6}
@@ -435,35 +437,44 @@ function avgForOutcome(metric,actId,want,lagDays){
 function renderPatterns(){
   const wrap=$("patterns");wrap.innerHTML="";const total=sortedDates().length;
   if(total<4){wrap.innerHTML='<div class="empty">Keep logging \u2014 patterns appear with more data.</div>';return}
-  const watch=[["physio_day","Physio (day)"],["walk","Light walking"],["mini_workout","Mini workout"],["heavywalk","Heavy walking"],["gym","Gym"],["caffeine","Caffeine"],["magnesium","Magnesium"],["ltheanine","L-Theanine"]];
+  const watch=ACTIVITIES.map(a=>[a.id,tagOf(a.id)]);
   const metrics=[
     {key:"arm",label:"Arm symptoms",higherBetter:false,mins:false},
     {key:"leg",label:"Leg symptoms",higherBetter:false,mins:false},
     {key:"sleep",label:"Sleep quality",higherBetter:true,mins:false},
     {key:"latency",label:"Time to sleep",higherBetter:false,mins:true},
   ];
-  let any=false;
+  const items=[];
   watch.forEach(([id,name])=>{
     const withN=sortedDates().filter(d=>entries[d].activities&&entries[d].activities[id]).length;
     const woN=sortedDates().filter(d=>!(entries[d].activities&&entries[d].activities[id])).length;
     if(withN<1||woN<1)return;
-    const rows=[];
+    const rows=[];let strength=0;
     metrics.forEach(m=>{
       const on=avgForOutcome(m.key,id,true,0),off=avgForOutcome(m.key,id,false,0);
       if(on==null||off==null)return;
-      const diff=on-off;const thresh=m.mins?3:0.5;
+      const diff=on-off;const thresh=m.mins?0.5:0.05;
       const improves=m.higherBetter?diff>0:diff<0;
       let cls="flat",verdict="similar";
       if(Math.abs(diff)>=thresh){cls=improves?"better":"worse";verdict=improves?"better":"worse"}
+      if(!m.mins)strength+=Math.abs(diff);
       const fmt=v=>m.mins?Math.round(v)+"m":v.toFixed(1);
       rows.push('<div class="pm"><span class="pm-label">'+m.label+'</span><span class="pm-verdict '+cls+'">'+verdict+'</span><span class="pm-nums">'+fmt(on)+' vs '+fmt(off)+'</span></div>');
     });
-    if(!rows.length)return;any=true;
+    if(!rows.length)return;
     const card=document.createElement("div");card.className="pat";
     card.innerHTML='<div class="pat-head"><span class="pat-name">'+name+'</span><span class="pat-count">'+withN+' with \u00b7 '+woN+' without</span></div>'+rows.join("");
-    wrap.appendChild(card);
+    items.push({card,strength});
   });
-  if(!any)wrap.innerHTML='<div class="empty">Need days with and without each activity to compare.</div>';
+  if(!items.length){wrap.innerHTML='<div class="empty">Need days with and without each activity to compare.</div>';return}
+  items.sort((a,b)=>b.strength-a.strength);
+  const extra=items.slice(3);
+  items.forEach((it,i)=>{if(i>=3)it.card.style.display="none";wrap.appendChild(it.card)});
+  if(extra.length){
+    const btn=document.createElement("button");btn.className="show-more";btn.textContent="Show "+extra.length+" more";btn.dataset.exp="0";
+    btn.addEventListener("click",()=>{const open=btn.dataset.exp==="1";extra.forEach(it=>it.card.style.display=open?"none":"");btn.dataset.exp=open?"0":"1";btn.textContent=open?"Show "+extra.length+" more":"Show less"});
+    wrap.appendChild(btn);
+  }
 }
 
 function renderInsights(){
@@ -599,6 +610,7 @@ function switchTab(tabId){
   document.querySelectorAll(".bnav-item").forEach(b=>b.classList.remove("active"));
   $(tabId).classList.add("active");
   document.querySelector('[data-tab="'+tabId+'"]').classList.add("active");
+  document.querySelector(".datebox").style.display=(tabId==="tab-log")?"flex":"none";
   if(tabId==="tab-insights")setTimeout(()=>renderChart(),50);
   if(tabId==="tab-history")renderCalendar();
 }
@@ -613,6 +625,7 @@ const CHANGELOG=[
   {v:"2.3",date:"01-06-2026",changes:["Fixed calendar Sunday column getting cut off on mobile."]},
   {v:"2.4",date:"01-06-2026",changes:["Arm and leg symptoms now compared same-day. Clearer Patterns layout and a floating nav bar on desktop."]},
   {v:"2.5",date:"01-06-2026",changes:["Redesigned bottom nav with icons. Added 'This week at a glance' summary and tap-to-toggle chart lines."]},
+  {v:"2.6",date:"01-06-2026",changes:["Removed date bar from Insights and History. Patterns now flag any difference and show top 3 with a 'show more' option."]},
 ];
 const CURRENT_VER=CHANGELOG[CHANGELOG.length-1].v;
 function checkNotifDot(){
