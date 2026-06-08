@@ -38,6 +38,7 @@ header.app{display:flex;align-items:baseline;justify-content:space-between;gap:1
 .seclabel:first-of-type{margin-top:4px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;transition:all .14s ease;user-select:none}
+.chip.chip-add{border-style:dashed;color:var(--muted);font-weight:700;padding:9px 16px}
 .chip:active{transform:scale(.97)}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(31,111,99,.25)}
 .slider-row{margin:14px 0 4px}
@@ -72,7 +73,10 @@ input[type=number]{max-width:160px}
 .leg-item:active{transform:scale(.96)}
 .leg-item.off{opacity:.35;text-decoration:line-through}
 .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
-.glance-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.glance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:3px;margin-bottom:14px;gap:3px}
+.seg-btn{font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);background:none;border:none;padding:7px 13px;border-radius:8px;cursor:pointer}
+.seg-btn.active{background:var(--card);color:var(--accent);box-shadow:var(--shadow)}
 .glance-tile{background:var(--bg);border-radius:12px;padding:13px 6px;text-align:center}
 .glance-val{font-family:"Fraunces",serif;font-size:22px;font-weight:600;line-height:1}
 .glance-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:6px;font-weight:600}
@@ -250,6 +254,10 @@ header.app{position:relative;padding-right:44px}
     <section class="card">
       <h2>What helps &amp; what worsens</h2>
       <p class="sub">Activities grouped by their overall effect on your symptoms and sleep.</p>
+      <div class="seg" id="hh-seg">
+        <button class="seg-btn active" data-lag="0">Same day</button>
+        <button class="seg-btn" data-lag="1">Previous day</button>
+      </div>
       <div id="helpshurts"></div>
     </section>
     <section class="card">
@@ -329,7 +337,7 @@ header.app{position:relative;padding-right:44px}
 </div>
 
 <script>
-const ACTIVITIES=[
+let ACTIVITIES=[
   {id:"physio_day",label:"Physio",tag:"Physio (day)",grp:"move"},
   {id:"walk",label:"Light walking",grp:"move"},
   {id:"heavywalk",label:"Heavy walking",grp:"move"},
@@ -365,11 +373,29 @@ const Store={
 let entries={};
 let chart=null;
 let hiddenDs=new Set();
+let hhLag=0;
+const CUSTOM_KEY="custom_activities";
 const $=id=>document.getElementById(id);
 
+async function loadCustom(){
+  try{const raw=await Store.get(CUSTOM_KEY);if(raw){const c=JSON.parse(raw)||[];c.forEach(x=>{if(x&&x.id&&!ACTIVITIES.some(a=>a.id===x.id))ACTIVITIES.push({id:x.id,label:x.label,grp:x.grp,custom:true})})}}catch{}
+}
+const GRP_LABEL={move:"Movement",bed:"Before bed",other:"Other"};
+async function addActivity(grp){
+  const name=(prompt("New "+GRP_LABEL[grp]+" item:")||"").trim();
+  if(!name)return;
+  if(ACTIVITIES.some(a=>(a.tag||a.label).toLowerCase()===name.toLowerCase())){alert("\""+name+"\" already exists.");return}
+  const id="c_"+Date.now().toString(36);
+  ACTIVITIES.push({id,label:name,grp,custom:true});
+  const custom=ACTIVITIES.filter(a=>a.custom).map(a=>({id:a.id,label:a.label,grp:a.grp}));
+  await Store.set(CUSTOM_KEY,JSON.stringify(custom));
+  const cur=readForm();buildChips();writeForm(cur);render();
+}
 function buildChips(){
   const map={move:"chips-move",bed:"chips-bed",other:"chips-other"};
+  Object.values(map).forEach(cid=>{const el=$(cid);if(el)el.innerHTML=""});
   ACTIVITIES.forEach(a=>{const el=document.createElement("button");el.className="chip";el.textContent=a.label;el.dataset.id=a.id;el.type="button";el.addEventListener("click",()=>el.classList.toggle("on"));$(map[a.grp]).appendChild(el)});
+  Object.keys(map).forEach(grp=>{const btn=document.createElement("button");btn.className="chip chip-add";btn.type="button";btn.textContent="+";btn.setAttribute("aria-label","Add "+GRP_LABEL[grp]+" item");btn.addEventListener("click",()=>addActivity(grp));$(map[grp]).appendChild(btn)});
 }
 function readForm(){
   const acts={};document.querySelectorAll(".chip").forEach(c=>{if(c.classList.contains("on"))acts[c.dataset.id]=true});
@@ -422,7 +448,6 @@ function renderWeekGlance(){
   const armP=avg(prev7,"arm"),legP=avg(prev7,"leg"),sleepP=avg(prev7,"sleep");
   const f=v=>v==null?"\u2013":v.toFixed(1);
   wrap.innerHTML=
-    tile("Logged",logged+"/7","var(--ink)",null)+
     tile("Arm avg",f(arm),"var(--arm)",arm!=null&&armP!=null?arm-armP:null,true)+
     tile("Leg avg",f(leg),"var(--leg)",leg!=null&&legP!=null?leg-legP:null,true)+
     tile("Sleep avg",f(sleep),"var(--sleep)",sleep!=null&&sleepP!=null?sleep-sleepP:null,false);
@@ -452,10 +477,11 @@ const PMETRICS=[
   {key:"sleep",label:"Sleep",higherBetter:true,mins:false,word:"sleep"},
   {key:"latency",label:"Time",higherBetter:false,mins:true,word:"falling asleep"},
 ];
-function activityEffects(id){
+function activityEffects(id,lag){
+  lag=lag||0;
   const out=[];let net=0;
   PMETRICS.forEach(m=>{
-    const on=avgForOutcome(m.key,id,true,0),off=avgForOutcome(m.key,id,false,0);
+    const on=avgForOutcome(m.key,id,true,lag),off=avgForOutcome(m.key,id,false,lag);
     if(on==null||off==null)return;
     const diff=on-off;const thresh=m.mins?0.5:0.05;
     const better=m.higherBetter?diff>0:diff<0;
@@ -475,7 +501,7 @@ function renderHelpsHurts(){
     const withN=sortedDates().filter(d=>entries[d].activities&&entries[d].activities[a.id]).length;
     const woN=sortedDates().filter(d=>!(entries[d].activities&&entries[d].activities[a.id])).length;
     if(withN<1||woN<1)return;
-    const {out,net}=activityEffects(a.id);
+    const {out,net}=activityEffects(a.id,hhLag);
     const sigEffects=out.filter(e=>e.sig);
     if(!sigEffects.length||Math.abs(net)<0.05)return;
     const betterW=sigEffects.filter(e=>e.better).map(e=>e.m.word);
@@ -674,6 +700,7 @@ const CHANGELOG=[
   {v:"2.5",date:"01-06-2026",changes:["Redesigned bottom nav with icons. Added 'This week at a glance' summary and tap-to-toggle chart lines."]},
   {v:"2.6",date:"01-06-2026",changes:["Removed date bar from Insights and History. Patterns now flag any difference and show top 3 with a 'show more' option."]},
   {v:"2.7",date:"01-06-2026",changes:["New 'What helps & worsens' summary and visual impact bars in Insights."]},
+  {v:"2.8",date:"01-06-2026",changes:["Add your own activity items with +. New previous-day view in 'What helps & worsens', refreshed logo, and tap a nav icon to jump back to top."]},
 ];
 const CURRENT_VER=CHANGELOG[CHANGELOG.length-1].v;
 function checkNotifDot(){
@@ -696,6 +723,7 @@ function closeChangelog(){$("changelog-overlay").classList.remove("open")}
 
 function bindSlider(s,v){$(s).addEventListener("input",()=>$(v).textContent=$(s).value)}
 async function init(){
+  await loadCustom();
   buildChips();
   bindSlider("s-arm","v-arm");bindSlider("s-leg","v-leg");bindSlider("s-sleep","v-sleep");
   const raw=await Store.get(KEY);if(raw){try{entries=JSON.parse(raw)||{}}catch{entries={}}}
@@ -713,7 +741,8 @@ async function init(){
   $("clearall").addEventListener("click",async()=>{if(confirm("Delete ALL entries?")){entries={};await Store.set(KEY,JSON.stringify(entries));render();writeForm(null)}});
   $("cal-prev").addEventListener("click",()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--}renderCalendar()});
   $("cal-next").addEventListener("click",()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++}renderCalendar()});
-  document.querySelectorAll(".bnav-item").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+  document.querySelectorAll(".bnav-item").forEach(b=>b.addEventListener("click",()=>{switchTab(b.dataset.tab);window.scrollTo({top:0,behavior:"smooth"})}));
+  document.querySelectorAll("#hh-seg .seg-btn").forEach(b=>b.addEventListener("click",()=>{hhLag=+b.dataset.lag;document.querySelectorAll("#hh-seg .seg-btn").forEach(x=>x.classList.toggle("active",x===b));renderHelpsHurts()}));
   $("kebab").addEventListener("click",e=>{e.stopPropagation();toggleDropdown()});
   $("btn-changelog").addEventListener("click",openChangelog);
   $("changelog-back").addEventListener("click",closeChangelog);
