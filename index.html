@@ -97,6 +97,31 @@ input[type=number]{max-width:160px}
 .pm-num{width:46px;text-align:right;font-size:12px;font-weight:600;flex-shrink:0}
 .show-more{display:block;width:100%;margin-top:14px;font-family:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:1px solid var(--line);border-radius:10px;padding:11px;cursor:pointer}
 .show-more:active{transform:scale(.98)}
+.tr{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.tr:last-child{border-bottom:none}
+.tr-name{font-weight:700;font-size:14px;width:46px}
+.tr-nums{font-size:13px;color:var(--muted)}
+.tr-verdict{margin-left:auto;font-size:11px;font-weight:700;padding:3px 11px;border-radius:99px;text-transform:capitalize}
+.tr-verdict.better{background:var(--accent-soft);color:var(--accent)}
+.tr-verdict.worse{background:#f6e3de;color:#a8392a}
+.tr-verdict.flat{background:#ece8de;color:var(--muted)}
+.dv-group{margin-bottom:16px}
+.dv-group:last-child{margin-bottom:0}
+.dv{padding:9px 0;border-bottom:1px solid var(--line)}
+.dv:last-child{border-bottom:none}
+.dv-top{display:flex;justify-content:space-between;align-items:baseline}
+.dv-name{font-size:14px;font-weight:600}
+.dv-eff{font-size:14px;font-weight:700}
+.dv-bar{height:6px;background:var(--line);border-radius:99px;margin:6px 0 5px;overflow:hidden}
+.dv-fill{height:100%;border-radius:99px}
+.dv-meta{font-size:11px;color:var(--muted)}
+.bw-item{padding:9px 0;border-bottom:1px solid var(--line)}
+.bw-item:last-child{border-bottom:none}
+.bw-head{display:flex;justify-content:space-between;align-items:baseline}
+.bw-date{font-size:13px;font-weight:600}
+.bw-val{font-size:12px;color:var(--muted);font-weight:600}
+.bw-acts{font-size:12px;color:var(--muted);margin-top:3px}
+.bw-note{margin-top:12px;font-size:12px;color:var(--ink);background:var(--bg);padding:10px 12px;border-radius:10px}
 .hh-group{margin-bottom:14px}
 .hh-group:last-child{margin-bottom:0}
 .hh-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:6px}
@@ -247,39 +272,35 @@ header.app{position:relative;padding-right:44px}
   <!-- TAB: INSIGHTS -->
   <div id="tab-insights" class="tab">
     <section class="card">
-      <h2>This week at a glance</h2>
-      <p class="sub">Last 7 days, vs the week before.</p>
-      <div class="glance-grid" id="glance"></div>
-    </section>
-    <section class="card">
-      <h2>What helps &amp; what worsens</h2>
-      <p class="sub">Activities grouped by their overall effect on your symptoms and sleep.</p>
-      <div class="seg" id="hh-seg">
-        <button class="seg-btn active" data-lag="0">Same day</button>
-        <button class="seg-btn" data-lag="1">Previous day</button>
-      </div>
-      <div id="helpshurts"></div>
-    </section>
-    <section class="card">
-      <h2>Activity impact</h2>
-      <p class="sub">How each activity shifts each outcome (same day). Bar left = <span style="color:#bf4a31">worse</span>, right = <span style="color:var(--accent)">better</span>.</p>
-      <div id="patterns"></div>
-    </section>
-    <section class="card">
-      <h2>Trends</h2>
-      <p class="sub">Tap a label to show or hide that line.</p>
-      <div class="legend">
+      <h2>Are you improving?</h2>
+      <p class="sub">Recent average vs the period before it.</p>
+      <div id="trend"></div>
+      <div class="legend" style="margin-top:16px">
         <button class="leg-item" data-ds="0"><i class="dot" style="background:var(--arm)"></i>Arm</button>
         <button class="leg-item" data-ds="1"><i class="dot" style="background:var(--leg)"></i>Leg / RLS</button>
-        <button class="leg-item" data-ds="2"><i class="dot" style="background:var(--sleep)"></i>Sleep quality</button>
+        <button class="leg-item" data-ds="2"><i class="dot" style="background:var(--sleep)"></i>Sleep</button>
       </div>
       <div class="chart-box"><canvas id="chart"></canvas></div>
       <div class="empty" id="chart-empty" style="display:none">Log a few days and your trend lines will appear here.</div>
     </section>
     <section class="card">
-      <h2>Observations</h2>
-      <p class="sub">Trends and streaks spotted in your data.</p>
-      <div id="insights"></div>
+      <h2>What's linked to it</h2>
+      <p class="sub">For the chosen outcome, what tracks with better or worse days — ranked, with how much to trust it.</p>
+      <div class="seg" id="focus-seg">
+        <button class="seg-btn active" data-m="arm">Arm</button>
+        <button class="seg-btn" data-m="leg">Leg</button>
+        <button class="seg-btn" data-m="sleep">Sleep</button>
+      </div>
+      <div class="seg" id="lag-seg" style="margin-left:6px">
+        <button class="seg-btn active" data-lag="0">Same day</button>
+        <button class="seg-btn" data-lag="1">Day before</button>
+      </div>
+      <div id="drivers"></div>
+    </section>
+    <section class="card">
+      <h2 id="bw-title">Best &amp; toughest days</h2>
+      <p class="sub">Your clearest days for the chosen outcome, and what you'd done.</p>
+      <div id="bestworst"></div>
     </section>
   </div>
 
@@ -430,28 +451,11 @@ async function delEntry(d){
 }
 
 function sortedDates(){return Object.keys(entries).sort()}
-function render(){buildWeekStrip();renderChart();renderWeekGlance();renderHelpsHurts();renderPatterns();renderInsights();renderCalendar();renderHistory()}
+function render(){buildWeekStrip();renderChart();renderTrend();renderDrivers();renderBestWorst();renderCalendar();renderHistory()}
 
-function renderWeekGlance(){
-  const wrap=$("glance");if(!wrap)return;
-  const today=new Date();today.setHours(12,0,0,0);
-  const span=(start,len)=>{const a=[];for(let i=start;i<start+len;i++){const d=new Date(today);d.setDate(d.getDate()-i);a.push(isoOf(d))}return a};
-  const last7=span(0,7),prev7=span(7,7);
-  const logged=last7.filter(d=>entries[d]).length;
-  const avg=(arr,k)=>{const v=arr.filter(d=>entries[d]).map(d=>entries[d][k]).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
-  const tile=(label,val,color,delta,lowerBetter)=>{
-    let dh="";
-    if(delta!=null&&Math.abs(delta)>=0.3){const better=lowerBetter?delta<0:delta>0;dh='<div class="glance-delta '+(better?"g":"r")+'">'+(delta<0?"\u2193":"\u2191")+Math.abs(delta).toFixed(1)+"</div>"}
-    return '<div class="glance-tile"><div class="glance-val" style="color:'+color+'">'+val+'</div><div class="glance-label">'+label+"</div>"+dh+"</div>";
-  };
-  const arm=avg(last7,"arm"),leg=avg(last7,"leg"),sleep=avg(last7,"sleep");
-  const armP=avg(prev7,"arm"),legP=avg(prev7,"leg"),sleepP=avg(prev7,"sleep");
-  const f=v=>v==null?"\u2013":v.toFixed(1);
-  wrap.innerHTML=
-    tile("Arm avg",f(arm),"var(--arm)",arm!=null&&armP!=null?arm-armP:null,true)+
-    tile("Leg avg",f(leg),"var(--leg)",leg!=null&&legP!=null?leg-legP:null,true)+
-    tile("Sleep avg",f(sleep),"var(--sleep)",sleep!=null&&sleepP!=null?sleep-sleepP:null,false);
-}
+const OUTCOMES={arm:{label:"Arm",higherBetter:false},leg:{label:"Leg",higherBetter:false},sleep:{label:"Sleep",higherBetter:true}};
+let focusMetric="arm";
+let driverLag=0;
 
 function renderChart(){
   const dates=sortedDates().slice(-30);const box=$("chart-empty");
@@ -471,120 +475,81 @@ function avgForOutcome(metric,actId,want,lagDays){
   if(!vals.length)return null;return vals.reduce((a,b)=>a+b,0)/vals.length;
 }
 
-const PMETRICS=[
-  {key:"arm",label:"Arm",higherBetter:false,mins:false,word:"arm"},
-  {key:"leg",label:"Leg",higherBetter:false,mins:false,word:"leg"},
-  {key:"sleep",label:"Sleep",higherBetter:true,mins:false,word:"sleep"},
-  {key:"latency",label:"Time",higherBetter:false,mins:true,word:"falling asleep"},
-];
-function activityEffects(id,lag){
-  lag=lag||0;
-  const out=[];let net=0;
-  PMETRICS.forEach(m=>{
-    const on=avgForOutcome(m.key,id,true,lag),off=avgForOutcome(m.key,id,false,lag);
+function trendOf(metric){
+  const ds=sortedDates().filter(d=>entries[d][metric]!=null);
+  if(ds.length<6)return null;
+  const w=Math.min(14,Math.floor(ds.length/2));
+  const recent=ds.slice(-w),earlier=ds.slice(-2*w,-w);
+  if(!earlier.length)return null;
+  const av=a=>a.reduce((s,d)=>s+entries[d][metric],0)/a.length;
+  return{r:av(recent),e:av(earlier)};
+}
+function renderTrend(){
+  const wrap=$("trend");if(!wrap)return;
+  wrap.innerHTML=Object.keys(OUTCOMES).map(k=>{
+    const o=OUTCOMES[k];const t=trendOf(k);
+    if(!t)return '<div class="tr"><span class="tr-name">'+o.label+'</span><span class="tr-verdict flat">need more data</span></div>';
+    const diff=t.r-t.e;
+    const improving=o.higherBetter?diff>0.3:diff<-0.3;
+    const worsening=o.higherBetter?diff<-0.3:diff>0.3;
+    const cls=improving?"better":worsening?"worse":"flat";
+    const word=improving?"improving":worsening?"worsening":"steady";
+    return '<div class="tr"><span class="tr-name">'+o.label+'</span><span class="tr-nums">'+t.e.toFixed(1)+' \u2192 '+t.r.toFixed(1)+'</span><span class="tr-verdict '+cls+'">'+word+'</span></div>';
+  }).join("");
+}
+
+function confidence(n,eff){
+  if(n>=7&&Math.abs(eff)>=1)return"strong";
+  if(n>=7)return"clear";
+  if(n>=4)return"likely";
+  return"tentative";
+}
+function lagCount(id,metric,want,lag){
+  return sortedDates().filter(d=>{const ad=dateShift(d,-lag);const ae=entries[ad];if(!ae)return false;if(entries[d][metric]==null)return false;return!!(ae.activities&&ae.activities[id])===want}).length;
+}
+function renderDrivers(){
+  const wrap=$("drivers");if(!wrap)return;wrap.innerHTML="";
+  const o=OUTCOMES[focusMetric];
+  if(sortedDates().length<5){wrap.innerHTML='<div class="empty">A correlation needs a couple of weeks of data to mean much \u2014 keep logging.</div>';return}
+  const accent=getComputedStyle(document.body).getPropertyValue("--accent").trim();
+  const list=[];
+  ACTIVITIES.forEach(a=>{
+    const on=avgForOutcome(focusMetric,a.id,true,driverLag),off=avgForOutcome(focusMetric,a.id,false,driverLag);
     if(on==null||off==null)return;
-    const diff=on-off;const thresh=m.mins?0.5:0.05;
-    const better=m.higherBetter?diff>0:diff<0;
-    const sig=Math.abs(diff)>=thresh;
-    out.push({m,on,off,diff,better,sig});
-    if(sig)net+=(m.mins?Math.abs(diff)/10:Math.abs(diff))*(better?1:-1);
+    const withN=lagCount(a.id,focusMetric,true,driverLag),woN=lagCount(a.id,focusMetric,false,driverLag);
+    if(withN<2||woN<2)return;
+    const eff=on-off;if(Math.abs(eff)<0.05)return;
+    const worse=o.higherBetter?eff<0:eff>0;
+    list.push({name:tagOf(a.id),eff,worse,n:withN,conf:confidence(Math.min(withN,woN),eff)});
   });
-  return{out,net};
-}
-function joinWords(a){if(a.length<=1)return a.join("");if(a.length===2)return a[0]+" & "+a[1];return a.slice(0,-1).join(", ")+" & "+a[a.length-1]}
-
-function renderHelpsHurts(){
-  const wrap=$("helpshurts");if(!wrap)return;wrap.innerHTML="";const total=sortedDates().length;
-  if(total<4){wrap.innerHTML='<div class="empty">Keep logging \u2014 this fills in with more data.</div>';return}
-  const helps=[],hurts=[];
-  ACTIVITIES.forEach(a=>{
-    const withN=sortedDates().filter(d=>entries[d].activities&&entries[d].activities[a.id]).length;
-    const woN=sortedDates().filter(d=>!(entries[d].activities&&entries[d].activities[a.id])).length;
-    if(withN<1||woN<1)return;
-    const {out,net}=activityEffects(a.id,hhLag);
-    const sigEffects=out.filter(e=>e.sig);
-    if(!sigEffects.length||Math.abs(net)<0.05)return;
-    const betterW=sigEffects.filter(e=>e.better).map(e=>e.m.word);
-    const worseW=sigEffects.filter(e=>!e.better).map(e=>e.m.word);
-    let detail;
-    if(net>0)detail=joinWords(betterW)+" better"+(worseW.length?" \u00b7 "+joinWords(worseW)+" worse":"");
-    else detail=joinWords(worseW)+" worse"+(betterW.length?" \u00b7 "+joinWords(betterW)+" better":"");
-    const item={name:tagOf(a.id),detail,net:Math.abs(net)};
-    (net>0?helps:hurts).push(item);
-  });
-  helps.sort((a,b)=>b.net-a.net);hurts.sort((a,b)=>b.net-a.net);
-  const group=(title,color,arr)=>{
-    let h='<div class="hh-group"><div class="hh-head"><span class="hh-dot" style="background:'+color+'"></span><span style="color:'+color+'">'+title+'</span></div>';
-    if(!arr.length)h+='<div class="hh-detail" style="padding:4px 0">Nothing clear yet.</div>';
-    else arr.forEach(it=>{h+='<div class="hh-item"><span class="hh-name">'+it.name+'</span><span class="hh-detail"> \u2014 '+it.detail+'</span></div>'});
-    return h+"</div>";
-  };
-  if(!helps.length&&!hurts.length){wrap.innerHTML='<div class="empty">No clear effects yet \u2014 keep logging.</div>';return}
-  wrap.innerHTML=group("Seems to help",getComputedStyle(document.body).getPropertyValue("--accent").trim(),helps)+group("Seems to worsen","#bf4a31",hurts);
+  if(!list.length){wrap.innerHTML='<div class="empty">No clear links to '+o.label.toLowerCase()+' yet. Keep logging.</div>';return}
+  const maxEff=Math.max.apply(null,list.map(x=>Math.abs(x.eff)).concat([1]));
+  const worseRows=list.filter(x=>x.worse).sort((a,b)=>Math.abs(b.eff)-Math.abs(a.eff));
+  const betterRows=list.filter(x=>!x.worse).sort((a,b)=>Math.abs(b.eff)-Math.abs(a.eff));
+  const row=(x,color)=>{const w=Math.min(Math.abs(x.eff)/maxEff,1)*100;const num=(x.eff>=0?"+":"")+x.eff.toFixed(1);
+    return '<div class="dv"><div class="dv-top"><span class="dv-name">'+x.name+'</span><span class="dv-eff" style="color:'+color+'">'+num+'</span></div><div class="dv-bar"><div class="dv-fill" style="width:'+w.toFixed(0)+'%;background:'+color+'"></div></div><div class="dv-meta">'+x.n+' days \u00b7 '+x.conf+'</div></div>'};
+  const grp=(title,color,arr)=>{let h='<div class="dv-group"><div class="hh-head"><span class="hh-dot" style="background:'+color+'"></span><span style="color:'+color+'">'+title+'</span></div>';h+=arr.length?arr.map(x=>row(x,color)).join(""):'<div class="dv-meta" style="padding:4px 0">Nothing clear.</div>';return h+"</div>"};
+  wrap.innerHTML=grp("Linked to worse "+o.label.toLowerCase(),"#bf4a31",worseRows)+grp("Linked to better "+o.label.toLowerCase(),accent,betterRows);
 }
 
-function renderPatterns(){
-  const wrap=$("patterns");wrap.innerHTML="";const total=sortedDates().length;
-  if(total<4){wrap.innerHTML='<div class="empty">Keep logging \u2014 patterns appear with more data.</div>';return}
-  const items=[];
-  ACTIVITIES.forEach(a=>{
-    const id=a.id,name=tagOf(id);
-    const withN=sortedDates().filter(d=>entries[d].activities&&entries[d].activities[id]).length;
-    const woN=sortedDates().filter(d=>!(entries[d].activities&&entries[d].activities[id])).length;
-    if(withN<1||woN<1)return;
-    const {out}=activityEffects(id);
-    if(!out.length)return;let strength=0;
-    const rows=out.map(e=>{
-      const m=e.m;const pct=Math.min(Math.abs(e.diff)/(m.mins?20:3),1)*50;
-      const color=e.sig?(e.better?getComputedStyle(document.body).getPropertyValue("--accent").trim():"#bf4a31"):"var(--muted)";
-      const side=e.better?"left:50%":"right:50%";
-      const fill=e.sig?'<div class="pm-fill" style="'+side+';width:'+pct.toFixed(0)+'%;background:'+color+'"></div>':"";
-      const num=m.mins?((e.diff>=0?"+":"")+Math.round(e.diff)+"m"):((e.diff>=0?"+":"")+e.diff.toFixed(1));
-      if(!m.mins)strength+=Math.abs(e.diff);
-      return '<div class="pm"><span class="pm-label">'+m.label+'</span><div class="pm-bar"><div class="pm-center"></div>'+fill+'</div><span class="pm-num" style="color:'+color+'">'+num+'</span></div>';
-    }).join("");
-    const card=document.createElement("div");card.className="pat";
-    card.innerHTML='<div class="pat-head"><span class="pat-name">'+name+'</span><span class="pat-count">'+withN+' with \u00b7 '+woN+' without</span></div>'+rows;
-    items.push({card,strength});
-  });
-  if(!items.length){wrap.innerHTML='<div class="empty">Need days with and without each activity to compare.</div>';return}
-  items.sort((a,b)=>b.strength-a.strength);
-  const extra=items.slice(3);
-  items.forEach((it,i)=>{if(i>=3)it.card.style.display="none";wrap.appendChild(it.card)});
-  if(extra.length){
-    const btn=document.createElement("button");btn.className="show-more";btn.textContent="Show "+extra.length+" more";btn.dataset.exp="0";
-    btn.addEventListener("click",()=>{const open=btn.dataset.exp==="1";extra.forEach(it=>it.card.style.display=open?"none":"");btn.dataset.exp=open?"0":"1";btn.textContent=open?"Show "+extra.length+" more":"Show less"});
-    wrap.appendChild(btn);
-  }
-}
-
-function renderInsights(){
-  const wrap=$("insights");wrap.innerHTML="";const dates=sortedDates();
-  if(dates.length<5){wrap.innerHTML='<div class="empty">Log about a week of data for insights to appear.</div>';return}
-  const ins=[];
-  const avg=arr=>arr.reduce((a,b)=>a+b,0)/arr.length;
-  const recent7=dates.slice(-7),prior7=dates.slice(-14,-7);
-  if(prior7.length>=3&&recent7.length>=3){
-    const rArm=avg(recent7.map(d=>entries[d].arm)),pArm=avg(prior7.map(d=>entries[d].arm));
-    if(pArm>0&&rArm<pArm-0.5){const p=Math.round((1-rArm/pArm)*100);ins.push({i:"ti-trending-down",t:"Arm scores improved ~"+p+"% this week vs the prior week.",c:"positive"})}
-    else if(pArm>0&&rArm>pArm+0.5){const p=Math.round((rArm/pArm-1)*100);ins.push({i:"ti-trending-up",t:"Arm scores are ~"+p+"% worse this week.",c:"negative"})}
-    const rSl=avg(recent7.map(d=>entries[d].sleep)),pSl=avg(prior7.map(d=>entries[d].sleep));
-    if(rSl>pSl+0.5)ins.push({i:"ti-moon",t:"Sleep quality up from "+pSl.toFixed(1)+" to "+rSl.toFixed(1)+" this week.",c:"positive"});
-    else if(rSl<pSl-0.5)ins.push({i:"ti-moon-off",t:"Sleep quality dropped from "+pSl.toFixed(1)+" to "+rSl.toFixed(1)+" this week.",c:"negative"});
-  }
-  let streak=0;const dd=new Date();
-  while(true){const iso=isoOf(dd);if(entries[iso]){streak++;dd.setDate(dd.getDate()-1)}else break}
-  if(streak>=7)ins.push({i:"ti-flame",t:streak+"-day logging streak! More data = more reliable patterns.",c:"positive"});
-  else if(streak>=3)ins.push({i:"ti-calendar-check",t:streak+" days logged in a row \u2014 keep it up.",c:"neutral"});
-  if(dates.length>=7){
-    const sorted=[...dates].sort((a,b)=>entries[b].arm-entries[a].arm);
-    const worst3=sorted.slice(0,3);const actCounts={};
-    worst3.forEach(d=>{const pe=entries[d];if(pe&&pe.activities)Object.keys(pe.activities).forEach(id=>{actCounts[id]=(actCounts[id]||0)+1})});
-    const common=Object.entries(actCounts).filter(([,c])=>c>=2).sort((a,b)=>b[1]-a[1]);
-    if(common.length&&common[0][1]>=2)ins.push({i:"ti-alert-circle",t:common[0][1]+" of your 3 worst arm days involved "+tagOf(common[0][0])+".",c:"negative"});
-  }
-  if(!ins.length)ins.push({i:"ti-brain",t:"Not enough contrast in your data yet. Keep tracking!",c:"neutral"});
-  ins.forEach(n=>{const el=document.createElement("div");el.className="ins";el.innerHTML='<div class="ins-icon '+n.c+'"></div><div class="ins-text">'+n.t+"</div>";wrap.appendChild(el)});
+function renderBestWorst(){
+  const wrap=$("bestworst");if(!wrap)return;wrap.innerHTML="";
+  const o=OUTCOMES[focusMetric];
+  const tt=$("bw-title");if(tt)tt.textContent="Best & toughest "+o.label.toLowerCase()+" days";
+  const ds=sortedDates().filter(d=>entries[d][focusMetric]!=null);
+  if(ds.length<5){wrap.innerHTML='<div class="empty">Needs more logged days.</div>';return}
+  const asc=[...ds].sort((a,b)=>entries[a][focusMetric]-entries[b][focusMetric]);
+  const best=o.higherBetter?asc.slice(-3).reverse():asc.slice(0,3);
+  const worst=o.higherBetter?asc.slice(0,3):asc.slice(-3).reverse();
+  const accent=getComputedStyle(document.body).getPropertyValue("--accent").trim();
+  const acts=d=>Object.keys(entries[d].activities||{}).map(id=>tagOf(id));
+  const item=d=>'<div class="bw-item"><div class="bw-head"><span class="bw-date">'+fmtDMY(d)+'</span><span class="bw-val">'+o.label+' '+entries[d][focusMetric]+'</span></div><div class="bw-acts">'+(acts(d).join(", ")||"nothing logged")+'</div></div>';
+  const grp=(title,color,arr)=>'<div class="dv-group"><div class="hh-head"><span class="hh-dot" style="background:'+color+'"></span><span style="color:'+color+'">'+title+'</span></div>'+arr.map(item).join("")+'</div>';
+  const freq=arr=>{const f={};arr.forEach(d=>Object.keys(entries[d].activities||{}).forEach(id=>f[id]=(f[id]||0)+1));return f};
+  const wf=freq(worst),bf=freq(best);let bestId=null,gap=0;
+  ACTIVITIES.forEach(a=>{const g=(wf[a.id]||0)-(bf[a.id]||0);if(g>gap){gap=g;bestId=a.id}});
+  const note=(bestId&&gap>=2)?'<div class="bw-note">More common on tough days: <b>'+tagOf(bestId)+'</b></div>':"";
+  wrap.innerHTML=grp("Best days",accent,best)+grp("Toughest days","#bf4a31",worst)+note;
 }
 
 function renderCalendar(){
@@ -701,6 +666,7 @@ const CHANGELOG=[
   {v:"2.6",date:"01-06-2026",changes:["Removed date bar from Insights and History. Patterns now flag any difference and show top 3 with a 'show more' option."]},
   {v:"2.7",date:"01-06-2026",changes:["New 'What helps & worsens' summary and visual impact bars in Insights."]},
   {v:"2.8",date:"01-06-2026",changes:["Add your own activity items with +. New previous-day view in 'What helps & worsens', refreshed logo, and tap a nav icon to jump back to top."]},
+  {v:"2.9",date:"01-06-2026",changes:["Rebuilt Insights into three focused views: are you improving, what's linked to each symptom (ranked, with confidence), and your best vs toughest days."]},
 ];
 const CURRENT_VER=CHANGELOG[CHANGELOG.length-1].v;
 function checkNotifDot(){
@@ -742,7 +708,8 @@ async function init(){
   $("cal-prev").addEventListener("click",()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--}renderCalendar()});
   $("cal-next").addEventListener("click",()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++}renderCalendar()});
   document.querySelectorAll(".bnav-item").forEach(b=>b.addEventListener("click",()=>{switchTab(b.dataset.tab);window.scrollTo({top:0,behavior:"smooth"})}));
-  document.querySelectorAll("#hh-seg .seg-btn").forEach(b=>b.addEventListener("click",()=>{hhLag=+b.dataset.lag;document.querySelectorAll("#hh-seg .seg-btn").forEach(x=>x.classList.toggle("active",x===b));renderHelpsHurts()}));
+  document.querySelectorAll("#focus-seg .seg-btn").forEach(b=>b.addEventListener("click",()=>{focusMetric=b.dataset.m;document.querySelectorAll("#focus-seg .seg-btn").forEach(x=>x.classList.toggle("active",x===b));renderDrivers();renderBestWorst()}));
+  document.querySelectorAll("#lag-seg .seg-btn").forEach(b=>b.addEventListener("click",()=>{driverLag=+b.dataset.lag;document.querySelectorAll("#lag-seg .seg-btn").forEach(x=>x.classList.toggle("active",x===b));renderDrivers()}));
   $("kebab").addEventListener("click",e=>{e.stopPropagation();toggleDropdown()});
   $("btn-changelog").addEventListener("click",openChangelog);
   $("changelog-back").addEventListener("click",closeChangelog);
